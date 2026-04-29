@@ -1,6 +1,6 @@
 # omakasui/build-apt-omakasui
 
-Builds and publishes APT packages distributed via [omakasui/apt-omakasui-packages](https://github.com/omakasui/apt-omakasui-packages).
+Builds and publishes APT packages distributed via [omakasui/apt-omakasui](https://github.com/omakasui/apt-omakasui).
 
 ## Repository layout
 
