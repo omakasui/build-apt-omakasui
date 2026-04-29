@@ -51,9 +51,18 @@ for dep in "${DEPS[@]}"; do
     continue
   fi
 
-  step "Downloading: ${DEP_NAME} v${DEP_VERSION} (${DISTRO}/${ARCH})..."
+  # External deps live in omakasui/build-apt-packages; siblings live in
+  # omakasui/build-apt-omakasui (this repo's release store).
+  DEP_EXTERNAL=$(yq e ".${dep}.external // false" "$(repo_root)/versions.yml" 2>/dev/null || echo false)
+  if [[ "$DEP_EXTERNAL" == "true" ]]; then
+    RELEASE_REPO="omakasui/build-apt-packages"
+  else
+    RELEASE_REPO="omakasui/build-apt-omakasui"
+  fi
+
+  step "Downloading: ${DEP_NAME} v${DEP_VERSION} (${DISTRO}/${ARCH}) from ${RELEASE_REPO}..."
   gh release download "${dep}-${DEP_VERSION}" \
-    --repo omakasui/build-apt-packages \
+    --repo "$RELEASE_REPO" \
     --pattern "${DEP_NAME}_${DEP_VERSION}_${DISTRO}_${ARCH}.deb" \
     --output "$DEP_FILE" || warn "failed to download ${DEP_NAME}"
 done
