@@ -1,0 +1,208 @@
+# Triggered on versions.yml changes (detects which packages changed) or manually.
+# External deps (external: true in versions.yml) are never built.
+name: Build package
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'versions.yml'
+
+  workflow_dispatch:
+    inputs:
+      package:
+        description: 'Package to build (must exist in versions.yml, must not be external: true)'
+        required: true
+        type: string
+      channel:
+        description: 'Publishing channel (stable or dev)'
+        required: false
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - stable
+
+jobs:
+  detect:
+    name: Detect package
+    runs-on: ubuntu-latest
+    outputs:
+      builds: ${{ steps.resolve.outputs.builds }}
+      build_matrix: ${{ steps.resolve.outputs.build_matrix }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 2
+
+      - name: Install yq
+        run: bash scripts/install-yq.sh
+
+      - name: Resolve packages and versions
+        id: resolve
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            bash scripts/detect-changes.sh --mode dispatch --package "${{ inputs.package }}"
+          else
+            bash scripts/detect-changes.sh --mode push
+          fi
+
+  build:
+    name: Build ${{ matrix.package }} / ${{ matrix.distro }} / ${{ matrix.arch }}
+    needs: detect
+    if: needs.detect.outputs.builds != '[]'
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.detect.outputs.build_matrix) }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup QEMU (arm64)
+        if: matrix.arch == 'arm64'
+        uses: docker/setup-qemu-action@v4
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Install yq
+        run: bash scripts/install-yq.sh
+
+      - name: Resolve package metadata for this job
+        id: meta
+        run: |
+          PKG="${{ matrix.package }}"
+          VERSION=$(yq e ".${PKG}.version" versions.yml)
+          DEPENDS=$(yq e ".${PKG}.depends_on | join(\",\")" versions.yml)
+          echo "package=${PKG}"        >> "$GITHUB_OUTPUT"
+          echo "version=${VERSION}"    >> "$GITHUB_OUTPUT"
+          echo "depends_on=${DEPENDS}" >> "$GITHUB_OUTPUT"
+
+      - name: Download custom dependencies
+        if: steps.meta.outputs.depends_on != ''
+        env:
+          GH_TOKEN: ${{ secrets.BUILD_PKG_DISPATCH_TOKEN }}
+        run: |
+          bash scripts/download-deps.sh \
+            --package "${{ steps.meta.outputs.package }}" \
+            --distro "${{ matrix.distro }}" \
+            --arch "${{ matrix.arch }}" \
+            --depends-on "${{ steps.meta.outputs.depends_on }}"
+
+      - name: Resolve arch:all skip
+        id: archcheck
+        run: |
+          PKG="${{ steps.meta.outputs.package }}"
+          PKG_ARCH="$(yq e '.arch // ""' "packages/${PKG}/package.yml")"
+          if [[ "$PKG_ARCH" == "all" && "${{ matrix.arch }}" == "arm64" ]]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build Docker image
+        if: steps.archcheck.outputs.skip != 'true'
+        run: |
+          PKG="${{ steps.meta.outputs.package }}"
+          VERSION="${{ steps.meta.outputs.version }}"
+
+          docker buildx build \
+            --platform "linux/${{ matrix.arch }}" \
+            --load \
+            --build-arg "BASE_IMAGE=${{ matrix.base }}" \
+            --build-arg "VERSION=${VERSION}" \
+            --tag "omakasui-build-${PKG}:local" \
+            "packages/${PKG}/"
+
+      - name: Extract and assemble .deb
+        if: steps.archcheck.outputs.skip != 'true'
+        run: |
+          bash scripts/extract-and-assemble.sh \
+            --image      "omakasui-build-${{ steps.meta.outputs.package }}:local" \
+            --package    "${{ steps.meta.outputs.package }}" \
+            --version    "${{ steps.meta.outputs.version }}" \
+            --arch       "${{ matrix.arch }}" \
+            --distro     "${{ matrix.distro }}" \
+            --output-dir output \
+            --depends-on "${{ steps.meta.outputs.depends_on }}"
+
+      - name: Upload artifact
+        if: steps.archcheck.outputs.skip != 'true'
+        uses: actions/upload-artifact@v6
+        with:
+          name: ${{ steps.meta.outputs.package }}-${{ matrix.distro }}-${{ matrix.arch }}
+          path: output/*.deb
+          retention-days: 1
+
+  release:
+    name: Create GitHub Release — ${{ matrix.package_entry.package }}
+    needs: [detect, build]
+    if: needs.detect.outputs.builds != '[]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    strategy:
+      matrix:
+        package_entry: ${{ fromJson(needs.detect.outputs.builds) }}
+
+    steps:
+      - name: Download artifacts for this package
+        uses: actions/download-artifact@v7
+        with:
+          path: artifacts/
+          pattern: ${{ matrix.package_entry.package }}-*
+          merge-multiple: true
+
+      - name: Create or update Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ matrix.package_entry.package }}-${{ matrix.package_entry.version }}
+          name: "${{ matrix.package_entry.package }} v${{ matrix.package_entry.version }}"
+          files: artifacts/*.deb
+          fail_on_unmatched_files: true
+          make_latest: true
+          overwrite_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  trigger-apt-update:
+    name: Trigger apt-omakasui (batch)
+    needs: [detect, release]
+    if: needs.detect.outputs.builds != '[]'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Build batch payload and dispatch
+        env:
+          GH_TOKEN: ${{ secrets.APT_OMAKASUI_DISPATCH_TOKEN }}
+        run: |
+          # Push-triggered builds always land on dev; stable promotion is done via promote.yml.
+          CHANNEL="${{ inputs.channel }}"
+          CHANNEL="${CHANNEL:-dev}"
+          PAYLOAD=$(echo '${{ needs.detect.outputs.builds }}' | jq -c --arg channel "$CHANNEL" '[
+            .[] | {
+              package: .package,
+              version: .version,
+              suites: ( .matrix.include | map(.suite) | unique | join(" ") ),
+              produces: .produces,
+              channel: $channel
+            }
+          ]')
+
+          BODY=$(jq -cn --argjson packages "$PAYLOAD" '{
+            event_type: "packages-updated",
+            client_payload: { packages: $packages }
+          }')
+
+          gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            /repos/omakasui/apt-omakasui/dispatches \
+            --input - <<< "$BODY"
