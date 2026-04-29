@@ -1,0 +1,55 @@
+# Source of truth for omakasui- package versions.
+# Pushing a change here triggers a build in CI.
+# depends_on: sibling packages required at build time (empty [] if none).
+#
+# External deps (external: true) are packages from omakasui/build-packages.
+# They are listed here only so download-deps.sh can resolve their versions.
+# They are NOT built in this repo and are excluded from CI matrices and lint.
+
+omakasui-aether:
+  version: "20260327.1"
+  depends_on:
+    - aether
+
+omakasui-nvim:
+  version: "20260327.2"
+  depends_on:
+    - nvim
+
+omakasui-walker:
+  version: "20260330.1"
+  depends_on:
+    - walker
+    - elephant
+
+omakasui-zellij:
+  version: "20260408.1"
+  depends_on:
+    - zellij
+
+# --- External deps (from omakasui/build-packages, not built here) ---
+
+aether:
+  version: "4.15.2"
+  depends_on: []
+  external: true
+
+elephant:
+  version: "2.21.0"
+  depends_on: []
+  external: true
+
+nvim:
+  version: "0.12.2"
+  depends_on: []
+  external: true
+
+walker:
+  version: "2.16.1-omakasui1"
+  depends_on: []
+  external: true
+
+zellij:
+  version: "0.44.1"
+  depends_on: []
+  external: true
