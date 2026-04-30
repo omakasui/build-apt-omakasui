@@ -1,4 +1,4 @@
-# Packages the aether configuration for omakasui/omakub/omadeb variants.
+# Packages the aether configuration for omakasui variants.
 # Upstream: https://github.com/bjarneo/aether
 
 ARG BASE_IMAGE
@@ -15,10 +15,10 @@ WORKDIR /build
 
 COPY setup-aether.template setup-aether.template
 
-# ── Package three .deb variants ──────────────────────────────────────────
+#
 RUN set -e; \
     mkdir -p /output; \
-    for PROJECT in omakasui omakub omadeb; do \
+    for PROJECT in omakasui omakub omadeb omari; do \
       PKG_NAME="${PROJECT}-aether"; \
       STAGED="/tmp/staged-${PROJECT}"; \
       \
