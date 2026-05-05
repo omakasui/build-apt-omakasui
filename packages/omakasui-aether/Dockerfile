@@ -18,7 +18,7 @@ COPY setup-aether.template setup-aether.template
 #
 RUN set -e; \
     mkdir -p /output; \
-    for PROJECT in omakasui omakub omadeb omari; do \
+    for PROJECT in omakub omadeb omari; do \
       PKG_NAME="${PROJECT}-aether"; \
       STAGED="/tmp/staged-${PROJECT}"; \
       \

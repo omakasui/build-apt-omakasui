@@ -14,7 +14,6 @@ runtime_depends:
   - gum
 
 produces:
-  - omakasui-aether
   - omakub-aether
   - omadeb-aether
   - omari-aether

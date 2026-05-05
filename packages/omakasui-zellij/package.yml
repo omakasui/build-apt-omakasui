@@ -14,7 +14,6 @@ runtime_depends:
 depends_on: []
 
 produces:
-  - omakasui-zellij
   - omakub-zellij
   - omadeb-zellij
   - omari-zellij

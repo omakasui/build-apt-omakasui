@@ -1,4 +1,4 @@
-# Packages the zellij configuration for omakasui/omakub/omadeb variants.
+# Packages the zellij configuration for omakasui variants.
 # Upstream: https://github.com/zellij-org/zellij
 
 ARG BASE_IMAGE
@@ -17,7 +17,7 @@ COPY setup-zellij.template setup-zellij.template
 
 RUN set -e; \
     mkdir -p /output; \
-    for PROJECT in omakasui omakub omadeb omari; do \
+    for PROJECT in omakub omadeb omari; do \
       PKG_NAME="${PROJECT}-zellij"; \
       SHARE_DIR="/usr/share/${PKG_NAME}"; \
       STAGED="/tmp/staged-${PROJECT}"; \

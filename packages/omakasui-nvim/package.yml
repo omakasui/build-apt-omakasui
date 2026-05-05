@@ -13,7 +13,6 @@ runtime_depends:
   - gum
 
 produces:
-  - omakasui-nvim
   - omakub-nvim
   - omadeb-nvim
   - omari-nvim

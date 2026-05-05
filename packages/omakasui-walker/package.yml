@@ -9,10 +9,8 @@ description: >
   Installs walker, elephant, and all elephant provider packages in one shot.
 
 produces:
-  - omakasui-walker
   - omadeb-walker
   - omakub-walker
-  - omari-walker
 
 runtime_depends:
   - walker
