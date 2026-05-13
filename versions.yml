@@ -6,6 +6,9 @@
 # They are listed here only so download-deps.sh can resolve their versions.
 # They are NOT built in this repo and are excluded from CI matrices and lint.
 
+gnome-shell-extension-grimble-tiling-wm:
+  version: "1.3.0"
+  depends_on: []
 omakasui-aether:
   version: "20260327.1"
   depends_on:
