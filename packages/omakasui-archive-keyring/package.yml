@@ -1,0 +1,16 @@
+name: omakasui-archive-keyring
+type: repackage
+arch: all
+section: misc
+priority: optional
+homepage:  https://codeberg.org/omakasui/omakasui-archive-keyring
+description: >
+  GPG signing keys for Omakasui APT repositories.
+  Provides the keys for packages.omakasui.org, core.omakasui.org and
+  mise.en.dev/deb.
+
+produces:
+  - omakasui-archive-keyring
+
+distros:
+  - debian13

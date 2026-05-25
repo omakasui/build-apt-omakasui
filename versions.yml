@@ -27,7 +27,7 @@ omakasui-zellij:
   depends_on:
     - zellij
 
-# --- External deps (from omakasui/build-packages, not built here) ---
+# External Deps (from omakasui/build-packages)
 
 aether:
   version: "4.15.2"
@@ -49,3 +49,18 @@ zellij:
   version: "0.44.1"
   depends_on: []
   external: true
+
+# Omari core packages (built from omakasui/omari-os)
+
+omakasui-archive-keyring:
+  version: "1.0.0"
+  depends_on: []
+omari-meta:
+  version: "1.0.0"
+  depends_on: []
+calamares-settings-omari:
+  version: "1.0.0"
+  depends_on: []
+omari-settings:
+  version: "1.0.0"
+  depends_on: []

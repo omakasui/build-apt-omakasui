@@ -1,0 +1,16 @@
+name: calamares-settings-omari
+type: repackage
+arch: all
+section: misc
+priority: optional
+homepage: https://codeberg.org/omakasui/calamares-settings-omari
+description: >
+  Calamares installer configuration for Omari OS.
+  Provides branding, modules, helpers and installer launcher for the
+  Omari live installer.
+
+produces:
+  - calamares-settings-omari
+
+distros:
+  - debian13
