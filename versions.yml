@@ -9,10 +9,6 @@
 gnome-shell-extension-grimble-tiling-wm:
   version: "1.3.0"
   depends_on: []
-omakasui-aether:
-  version: "20260327.1"
-  depends_on:
-    - aether
 omakasui-nvim:
   version: "20260327.2"
   depends_on:
@@ -29,10 +25,6 @@ omakasui-zellij:
 
 # External Deps (from omakasui/build-packages)
 
-aether:
-  version: "4.15.2"
-  depends_on: []
-  external: true
 elephant:
   version: "2.21.0"
   depends_on: []
