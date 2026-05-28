@@ -47,6 +47,9 @@ zellij:
 omakasui-archive-keyring:
   version: "1.0.0"
   depends_on: []
+omari-base-files:
+  version: "1.0.0-testing1"
+  depends_on: []
 omari-meta:
   version: "1.0.0-testing1"
   depends_on: []
