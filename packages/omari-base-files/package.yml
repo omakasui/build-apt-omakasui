@@ -1,14 +1,14 @@
-name: omari-settings
+name: omari-base-files
 type: repackage
 arch: all
 section: misc
 priority: optional
-homepage: https://codeberg.org/omakasui/omari-settings.git
+homepage: https://codeberg.org/omakasui/omari-base-files.git
 description: >
-  Default settings and dotfiles for Omari OS.
+  Base files for Omari OS.
 
 produces:
-  - omari-settings
+  - omari-base-files
 
 distros:
   - debian13

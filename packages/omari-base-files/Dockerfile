@@ -16,9 +16,9 @@ RUN apt-get update -qq && apt-get install -y --no-install-recommends \
 
 WORKDIR /build
 
-RUN git clone --depth=1 https://codeberg.org/omakasui/omari-settings.git omari-settings
+RUN git clone --depth=1 https://codeberg.org/omakasui/omari-base-files.git omari-base-files
 
-WORKDIR /build/omari-settings
+WORKDIR /build/omari-base-files
 
 RUN dpkg-buildpackage -b -uc -us
 
