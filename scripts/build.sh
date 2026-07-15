@@ -155,7 +155,6 @@ fi
 
 step "Assembling from debian/ template..."
 
-INSTALLED_SIZE=$(du -sk --exclude=DEBIAN "$STAGED_TMP" | cut -f1)
 RFC2822_DATE=$(date -R)
 
 for DEB_NAME in "${PRODUCE_NAMES[@]}"; do
@@ -163,10 +162,15 @@ for DEB_NAME in "${PRODUCE_NAMES[@]}"; do
   CTRL_TEMPLATE="${DEBIAN_DIR}/control"
   [[ -f "${DEBIAN_DIR}/control.${DEB_NAME}" ]] && CTRL_TEMPLATE="${DEBIAN_DIR}/control.${DEB_NAME}"
 
+  SRC="${STAGED_TMP}"
+  [[ -d "${STAGED_TMP}/${DEB_NAME}" ]] && SRC="${STAGED_TMP}/${DEB_NAME}"
+
   DEB_ROOT="${BUILD_TMP}/${DEB_NAME}"
   mkdir -p "${DEB_ROOT}/DEBIAN"
-  cp -r "${STAGED_TMP}/." "${DEB_ROOT}/"
+  cp -r "${SRC}/." "${DEB_ROOT}/"
   rm -f "${DEB_ROOT}/DEBIAN/control"
+
+  INSTALLED_SIZE=$(du -sk --exclude=DEBIAN "$SRC" | cut -f1)
 
   sed \
     -e "s|@VERSION@|${VERSION}|g" \
