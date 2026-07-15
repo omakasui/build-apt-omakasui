@@ -1,14 +1,11 @@
 # Source of truth for omakasui- package versions.
 # Pushing a change here triggers a build in CI.
-# depends_on: sibling packages required at build time (empty [] if none).
+# depends_on: packages from omakasui/build-apt-packages required at Docker build time.
 #
-# External deps (external: true) are packages from omakasui/build-packages.
-# They are listed here only so download-deps.sh can resolve their versions.
+# External deps (external: true) are packages from omakasui/build-apt-packages.
+# They are listed here only so build.sh can resolve their versions.
 # They are NOT built in this repo and are excluded from CI matrices and lint.
 
-gnome-shell-extension-grimble-tiling-wm:
-  version: "1.3.0"
-  depends_on: []
 omakasui-nvim:
   version: "20260327.2"
   depends_on:
