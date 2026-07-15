@@ -1,0 +1,12 @@
+Package: @PACKAGE@
+Version: @VERSION@-1+@SUITE@
+Architecture: @ARCH@
+Maintainer: omakasui <packages@omakasui.org>
+Installed-Size: @INSTALLED_SIZE@
+Depends: zellij, gum
+Section: utils
+Priority: optional
+Homepage: https://zellij.dev
+Description: Zellij configuration (@PACKAGE@)
+ Installs omakub-based zellij config and a setup script.
+ Run the bundled *-setup-zellij script to activate it for the current user.

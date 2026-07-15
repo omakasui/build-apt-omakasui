@@ -1,12 +1,5 @@
-name: omari-meta
 type: repackage
 arch: all
-section: metapackages
-priority: optional
-homepage: https://codeberg.org/omakasui/omari-meta
-description: >
-  Omari OS metapackages.
-  Provides omari-base, omari-desktop-niri, omari-drivers and omari-live.
 
 produces:
   - omari-base

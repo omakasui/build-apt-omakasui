@@ -1,11 +1,5 @@
-name: omari-settings
 type: repackage
 arch: all
-section: misc
-priority: optional
-homepage: https://codeberg.org/omakasui/omari-settings.git
-description: >
-  Default settings and dotfiles for Omari OS.
 
 produces:
   - omari-settings

@@ -1,11 +1,5 @@
-name: omari-base-files
 type: repackage
 arch: all
-section: misc
-priority: optional
-homepage: https://codeberg.org/omakasui/omari-base-files.git
-description: >
-  Base files for Omari OS.
 
 produces:
   - omari-base-files

@@ -4,6 +4,7 @@ ARG BASE_IMAGE
 FROM ${BASE_IMAGE:-debian:trixie-slim}
 
 ARG VERSION
+ARG SUITE
 
 RUN apt-get update -qq && apt-get install -y --no-install-recommends \
     build-essential \
@@ -22,4 +23,8 @@ WORKDIR /build/calamares-settings-omari
 
 RUN dpkg-buildpackage -b -uc -us
 
-RUN mkdir -p /output && cp /build/*.deb /output/
+RUN mkdir -p /output && \
+    for f in /build/*.deb; do \
+      name=$(dpkg-deb --field "$f" Package); \
+      cp "$f" "/output/${name}_${VERSION}-1+${SUITE}_all.deb"; \
+    done

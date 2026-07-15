@@ -1,0 +1,12 @@
+Package: @PACKAGE@
+Version: @VERSION@-1+@SUITE@
+Architecture: @ARCH@
+Maintainer: omakasui <packages@omakasui.org>
+Installed-Size: @INSTALLED_SIZE@
+Depends: nvim, git, gum
+Section: editors
+Priority: optional
+Homepage: https://github.com/LazyVim/LazyVim
+Description: Pre-built LazyVim configuration (@PACKAGE@)
+ Installs pre-cached config and plugins to /usr/share/@PACKAGE@.
+ Run the bundled *-setup-nvim script to activate it for the current user.

@@ -8,6 +8,7 @@ SHELL ["/bin/bash", "-c"]
 
 ARG VERSION
 ARG TARGETARCH
+ARG SUITE
 
 RUN apt-get update -qq && apt-get install -y --no-install-recommends \
     curl \
@@ -17,7 +18,6 @@ RUN apt-get update -qq && apt-get install -y --no-install-recommends \
     npm \
     unzip \
     build-essential \
-    fakeroot \
   && rm -rf /var/lib/apt/lists/*
 
 RUN npm install -g tree-sitter-cli
@@ -63,13 +63,12 @@ RUN cp -r lua/    "$XDG_CONFIG_HOME/nvim/lua/"  && \
 # Pre-cache plugins once — shared by all three variants.
 RUN nvim --headless "+Lazy! sync" "+qa!" || true
 
-# Build all three .deb files.
 RUN set -e; \
-    mkdir -p /output; \
-    for PROJECT in omakub omadeb omari; do \
+    mkdir -p /output/staged; \
+    for PROJECT in omakub omadeb; do \
       PKG_NAME="${PROJECT}-nvim"; \
       SHARE_DIR="/usr/share/${PKG_NAME}"; \
-      STAGED="/tmp/staged-${PROJECT}"; \
+      STAGED="/output/staged/${PKG_NAME}"; \
       \
       # Stage config and data. \
       mkdir -p "${STAGED}${SHARE_DIR}"; \
@@ -88,32 +87,4 @@ RUN set -e; \
         -e "s|{{PKG_NAME}}|${PKG_NAME}|g" \
         /build/setup-nvim.template > "$SETUP"; \
       chmod 755 "$SETUP"; \
-      \
-      # Write DEBIAN/control. \
-      DEB_ROOT="/tmp/deb-${PROJECT}"; \
-      mkdir -p "${DEB_ROOT}/DEBIAN"; \
-      cp -r "${STAGED}/." "${DEB_ROOT}/"; \
-      SIZE=$(du -sk "$STAGED" | cut -f1); \
-      printf "Package: %s\nVersion: %s\nArchitecture: all\n" \
-        "${PKG_NAME}" "${VERSION}" > "${DEB_ROOT}/DEBIAN/control"; \
-      printf "Maintainer: omakasui <packages@omakasui.org>\n" \
-        >> "${DEB_ROOT}/DEBIAN/control"; \
-      printf "Installed-Size: %s\n" "${SIZE}" \
-        >> "${DEB_ROOT}/DEBIAN/control"; \
-      printf "Depends: nvim, git, gum\n" \
-        >> "${DEB_ROOT}/DEBIAN/control"; \
-      printf "Section: editors\nPriority: optional\n" \
-        >> "${DEB_ROOT}/DEBIAN/control"; \
-      printf "Homepage: https://github.com/LazyVim/LazyVim\n" \
-        >> "${DEB_ROOT}/DEBIAN/control"; \
-      printf "Description: Pre-built LazyVim configuration for %s\n" "${PROJECT}" \
-        >> "${DEB_ROOT}/DEBIAN/control"; \
-      printf " Installs pre-cached config and plugins to %s.\n" "${SHARE_DIR}" \
-        >> "${DEB_ROOT}/DEBIAN/control"; \
-      printf " Run %s-setup-nvim to activate for the current user.\n" "${PROJECT}" \
-        >> "${DEB_ROOT}/DEBIAN/control"; \
-      \
-      fakeroot dpkg-deb --build "${DEB_ROOT}" \
-        "/output/${PKG_NAME}_${VERSION}_all.deb"; \
-      echo "Built: $(ls -lh /output/${PKG_NAME}_${VERSION}_all.deb)"; \
     done
