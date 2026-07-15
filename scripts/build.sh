@@ -80,8 +80,21 @@ if [[ -n "$DEPENDS_ON" && "$DEPENDS_ON" != "null" ]]; then
   IFS=',' read -ra DEPS <<< "$DEPENDS_ON"
   for dep in "${DEPS[@]}"; do
     [[ -z "$dep" ]] && continue
-    DEP_VERSION=$(yq e ".${dep}.version // \"\"" versions.yml)
-    [[ -n "$DEP_VERSION" && "$DEP_VERSION" != "null" ]] || die "dep '${dep}' not in versions.yml"
+    IS_EXTERNAL=$(yq e ".${dep}.external // false" versions.yml)
+
+    if [[ "$IS_EXTERNAL" == "true" ]]; then
+      command -v gh >/dev/null 2>&1 || die "gh CLI required to resolve latest '${dep}' release from omakasui/build-apt-packages"
+      DEP_TAG=$(gh release list --repo omakasui/build-apt-packages \
+                  --exclude-drafts --exclude-pre-releases -L 200 \
+                  --json tagName -q '.[].tagName' | grep -m1 "^${dep}-") \
+        || die "No releases found for external dep '${dep}' in omakasui/build-apt-packages"
+      DEP_VERSION="${DEP_TAG#"${dep}"-}"
+    else
+      DEP_VERSION=$(yq e ".${dep}.version // \"\"" versions.yml)
+      [[ -n "$DEP_VERSION" && "$DEP_VERSION" != "null" ]] || die "dep '${dep}' not in versions.yml"
+      DEP_TAG="${dep}-${DEP_VERSION}"
+    fi
+
     DEP_NAME=$(yq e '.produces[0] // ""' "packages/${dep}/package.yml" 2>/dev/null || true)
     [[ -z "$DEP_NAME" || "$DEP_NAME" == "null" ]] && DEP_NAME="$dep"
     DEP_FILE="${DEPS_DIR}/${DEP_NAME}_${DEP_VERSION}-1+${SUITE}_${ARCH}.deb"
@@ -90,11 +103,11 @@ if [[ -n "$DEPENDS_ON" && "$DEPENDS_ON" != "null" ]]; then
     fi
     command -v gh >/dev/null 2>&1 || { warn "gh CLI not found — place ${DEP_FILE} manually"; continue; }
     step "Downloading dep: ${DEP_NAME} v${DEP_VERSION} (${SUITE}/${ARCH})..."
-    gh release download "${dep}-${DEP_VERSION}" \
+    gh release download "${DEP_TAG}" \
       --repo omakasui/build-apt-packages \
       --pattern "${DEP_NAME}_${DEP_VERSION}-1+${SUITE}_${ARCH}.deb" \
       --output "$DEP_FILE" \
-      || die "Failed to download dep '${DEP_NAME} ${DEP_VERSION}'. Build '${dep}' for ${DISTRO} first."
+      || die "Failed to download dep '${DEP_NAME} ${DEP_VERSION}' (release ${DEP_TAG}) for ${SUITE}/${ARCH}."
   done
 fi
 

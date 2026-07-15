@@ -3,8 +3,9 @@
 # depends_on: packages from omakasui/build-apt-packages required at Docker build time.
 #
 # External deps (external: true) are packages from omakasui/build-apt-packages.
-# They are listed here only so build.sh can resolve their versions.
 # They are NOT built in this repo and are excluded from CI matrices and lint.
+# No version is pinned here — build.sh always fetches the latest release
+# published for that package by omakasui/build-apt-packages.
 
 omakasui-nvim:
   version: "20260327.2"
@@ -12,30 +13,14 @@ omakasui-nvim:
     - nvim
 omakasui-walker:
   version: "20260330.1"
-  depends_on:
-    - walker
-    - elephant
+  depends_on: []
 omakasui-zellij:
   version: "20260408.1"
-  depends_on:
-    - zellij
+  depends_on: []
 
 # External Deps (from omakasui/build-packages)
 
-elephant:
-  version: "2.21.0"
-  depends_on: []
-  external: true
 nvim:
-  version: "0.12.2"
-  depends_on: []
-  external: true
-walker:
-  version: "2.16.1-omakasui1"
-  depends_on: []
-  external: true
-zellij:
-  version: "0.44.1"
   depends_on: []
   external: true
 
