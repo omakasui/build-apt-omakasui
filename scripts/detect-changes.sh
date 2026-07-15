@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# detect-changes.sh — Detect changed packages and build CI matrices.
-# Usage: detect-changes.sh --mode push|dispatch|distro [--package <name>] [--distro <name>]
+# detect-changes.sh — Detect changed packages and emit CI matrices.
+# Usage: detect-changes.sh --mode push|dispatch|distro|all [--package <name>] [--distro <name>]
+# Note: entries with external: true in versions.yml are never built and are always skipped.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib/common.sh
@@ -23,7 +24,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-[[ -z "$MODE" ]] && die "--mode is required (push, dispatch, or distro)"
+[[ -z "$MODE" ]] && die "--mode is required (push, dispatch, distro, or all)"
 
 cd "$(repo_root)"
 
@@ -35,13 +36,24 @@ _output() {
   fi
 }
 
-if [[ "$MODE" == "distro" ]]; then
-  [[ -z "$FILTER_DISTRO" ]] && die "--distro is required for distro mode"
-  # Queue all non-external packages that include this distro.
+_is_external() {
+  local pkg="$1"
+  yq e ".${pkg}.external // false" versions.yml 2>/dev/null || echo false
+}
+
+if [[ "$MODE" == "all" ]]; then
+  # Rebuild every non-external package across every distro.
   PACKAGES=""
   while IFS= read -r pkg; do
-    external=$(yq e ".${pkg}.external // false" versions.yml 2>/dev/null || echo false)
-    [[ "$external" == "true" ]] && continue
+    [[ "$(_is_external "$pkg")" == "true" ]] && continue
+    PACKAGES="$PACKAGES $pkg"
+  done < <(pkg_all_keys)
+  PACKAGES=$(echo "$PACKAGES" | xargs)
+elif [[ "$MODE" == "distro" ]]; then
+  [[ -z "$FILTER_DISTRO" ]] && die "--distro is required for distro mode"
+  PACKAGES=""
+  while IFS= read -r pkg; do
+    [[ "$(_is_external "$pkg")" == "true" ]] && continue
     if pkg_distros "$pkg" | grep -qx "$FILTER_DISTRO"; then
       PACKAGES="$PACKAGES $pkg"
     fi
@@ -59,8 +71,7 @@ else
   PACKAGES=""
   while IFS= read -r pkg; do
     # Skip external deps — they are version-tracked only, not built here.
-    external=$(yq e ".${pkg}.external // false" versions.yml)
-    [[ "$external" == "true" ]] && continue
+    [[ "$(_is_external "$pkg")" == "true" ]] && continue
     OLD_VER=$(yq e ".${pkg}.version // \"\"" "$OLD_VERSIONS")
     NEW_VER=$(yq e ".${pkg}.version // \"\"" versions.yml)
     if [[ "$OLD_VER" != "$NEW_VER" ]]; then
@@ -70,7 +81,7 @@ else
   PACKAGES=$(echo "$PACKAGES" | xargs)
 fi
 
-# Expand triggers: if a changed package declares triggers[], add them too.
+# Expand triggers: packages listed in triggers[] are built alongside the changed package.
 TRIGGERED=""
 for PKG in $PACKAGES; do
   if yq e ".${PKG}.triggers" versions.yml | grep -qv 'null'; then
@@ -94,11 +105,12 @@ BUILDS='[]'
 FLAT_MATRIX='[]'
 
 for PKG in $PACKAGES; do
-  external=$(yq e ".${PKG}.external // false" versions.yml 2>/dev/null || echo false)
-  if [[ "$external" == "true" ]]; then
-    warn "${PKG} is an external dep, skipping build."
+  # Safety guard: skip external packages if they slip through (e.g. manual dispatch).
+  if [[ "$(_is_external "$PKG")" == "true" ]]; then
+    warn "${PKG} is an external dep — skipping."
     continue
   fi
+
   VERSION=$(yq e ".${PKG}.version // \"\"" versions.yml)
   if [[ -z "$VERSION" || "$VERSION" == "null" ]]; then
     warn "${PKG} not found in versions.yml, skipping."
@@ -110,7 +122,7 @@ for PKG in $PACKAGES; do
   FROZEN_SUITES=$(yq e ".${PKG}.frozen_suites // [] | join(\" \")" versions.yml)
   MATRIX_INCLUDES='[]'
   while IFS= read -r distro; do
-    # In distro mode, only include the requested distro.
+    # In distro mode, skip packages that don't target the requested distro.
     [[ -n "$FILTER_DISTRO" && "$distro" != "$FILTER_DISTRO" ]] && continue
     BASE=$(matrix_base_image "$distro")
     SUITE=$(yq e ".distros.${distro}.suite" "$(repo_root)/build-matrix.yml")
@@ -129,7 +141,7 @@ for PKG in $PACKAGES; do
     done < <(matrix_arches "$distro")
   done < <(pkg_distros "$PKG")
 
-  PRODUCES=$(yq e '.produces // [] | join(",")' "$(repo_root)/packages/${PKG}/package.yml")
+  PRODUCES=$(pkg_produces "$PKG" | paste -sd,)
 
   STABLE_RELEASE=$(yq e ".${PKG}.stable_release // false" "$(repo_root)/versions.yml")
   PKG_CHANNEL="dev"
