@@ -1,47 +1,55 @@
 # Source of truth for omakasui- package versions.
 # Pushing a change here triggers a build in CI.
-# depends_on: packages from omakasui/build-apt-packages required at Docker build time.
-#
-# External deps (external: true) are packages from omakasui/build-apt-packages.
-# They are NOT built in this repo and are excluded from CI matrices and lint.
-# No version is pinned here — build.sh always fetches the latest release
-# published for that package by omakasui/build-apt-packages.
+# depends_on: list of package names that must be built first (and installed in the chroot) for this package to build
+# auto_update: set to false to exclude a package from the periodic version check.
+# external: if true, the package is from omakasui/build-apt-packages.
 
 omakasui-devtools:
   version: "0.0.1"
   depends_on: []
   stable_release: false
+  auto_update: true
 omakasui-nvim:
-  version: "20260327.2"
+  version: "0.0.1"
   depends_on:
     - nvim
+  auto_update: true
 omakasui-walker:
   version: "20260330.1"
   depends_on: []
+  auto_update: false
 omakasui-zellij:
   version: "20260408.1"
   depends_on: []
+  auto_update: false
 
 # External Deps (from omakasui/build-packages)
 
 nvim:
+  version: "0.12.4"
   depends_on: []
   external: true
+  auto_update: true
 
 # Omari core packages (built from omakasui/omari-os)
 
 omakasui-archive-keyring:
   version: "1.0.0"
   depends_on: []
+  auto_update: false
 omari-base-files:
   version: "1.0.0-testing1"
   depends_on: []
+  auto_update: false
 omari-meta:
   version: "1.0.0-testing1"
   depends_on: []
+  auto_update: false
 calamares-settings-omari:
   version: "1.0.0-testing1"
   depends_on: []
+  auto_update: false
 omari-settings:
   version: "1.0.0-testing1"
   depends_on: []
+  auto_update: false
