@@ -80,20 +80,9 @@ if [[ -n "$DEPENDS_ON" && "$DEPENDS_ON" != "null" ]]; then
   IFS=',' read -ra DEPS <<< "$DEPENDS_ON"
   for dep in "${DEPS[@]}"; do
     [[ -z "$dep" ]] && continue
-    IS_EXTERNAL=$(yq e ".${dep}.external // false" versions.yml)
-
-    if [[ "$IS_EXTERNAL" == "true" ]]; then
-      command -v gh >/dev/null 2>&1 || die "gh CLI required to resolve latest '${dep}' release from omakasui/build-apt-packages"
-      DEP_TAG=$(gh release list --repo omakasui/build-apt-packages \
-                  --exclude-drafts --exclude-pre-releases -L 200 \
-                  --json tagName -q '.[].tagName' | grep -m1 "^${dep}-") \
-        || die "No releases found for external dep '${dep}' in omakasui/build-apt-packages"
-      DEP_VERSION="${DEP_TAG#"${dep}"-}"
-    else
-      DEP_VERSION=$(yq e ".${dep}.version // \"\"" versions.yml)
-      [[ -n "$DEP_VERSION" && "$DEP_VERSION" != "null" ]] || die "dep '${dep}' not in versions.yml"
-      DEP_TAG="${dep}-${DEP_VERSION}"
-    fi
+    DEP_VERSION=$(yq e ".${dep}.version // \"\"" versions.yml)
+    [[ -n "$DEP_VERSION" && "$DEP_VERSION" != "null" ]] || die "dep '${dep}' has no version in versions.yml"
+    DEP_TAG="${dep}-${DEP_VERSION}"
 
     DEP_NAME=$(yq e '.produces[0] // ""' "packages/${dep}/package.yml" 2>/dev/null || true)
     [[ -z "$DEP_NAME" || "$DEP_NAME" == "null" ]] && DEP_NAME="$dep"
@@ -115,6 +104,16 @@ fi
 
 IMAGE_TAG="omakasui-build-${PKG}:local"
 
+# Layer caching is opt-in per package
+if [[ -n "${GITHUB_ACTIONS:-}" && "$(yq e '.layer_cache // false' "$PKG_YAML")" == "true" ]]; then
+  CACHE_SCOPE="${PKG}-${DISTRO}-${ARCH}"
+  CACHE_ARGS=(
+    --cache-from "type=gha,scope=${CACHE_SCOPE}"
+    --cache-to   "type=gha,mode=max,scope=${CACHE_SCOPE}"
+  )
+  step "Layer cache enabled (scope: ${CACHE_SCOPE})"
+fi
+
 info "Building Docker image..."
 docker buildx build \
   --platform "linux/${ARCH}" \
@@ -122,6 +121,7 @@ docker buildx build \
   --build-arg "BASE_IMAGE=${BASE_IMAGE}" \
   --build-arg "VERSION=${VERSION}" \
   --build-arg "SUITE=${SUITE}" \
+  "${CACHE_ARGS[@]}" \
   --tag "$IMAGE_TAG" \
   "${PKG_DIR}/"
 

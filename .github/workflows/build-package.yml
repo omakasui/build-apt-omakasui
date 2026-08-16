@@ -151,6 +151,12 @@ jobs:
       - name: Setup Docker Buildx
         if: steps.check.outputs.skip != 'true'
         uses: docker/setup-buildx-action@v4
+      - name: Cache dependency .deb files
+        if: steps.check.outputs.skip != 'true'
+        uses: actions/cache@v4
+        with:
+          path: packages/*/deps
+          key: deps-${{ matrix.package }}-${{ matrix.distro }}-${{ matrix.arch }}-${{ hashFiles('versions.yml') }}
       - name: Build package
         if: steps.check.outputs.skip != 'true'
         env:
@@ -235,6 +241,13 @@ jobs:
       - name: Setup Docker Buildx
         if: steps.check.outputs.skip != 'true'
         uses: docker/setup-buildx-action@v4
+
+      - name: Cache dependency .deb files
+        if: steps.check.outputs.skip != 'true'
+        uses: actions/cache@v4
+        with:
+          path: packages/*/deps
+          key: deps-${{ matrix.package }}-${{ matrix.distro }}-${{ matrix.arch }}-${{ hashFiles('versions.yml') }}
 
       - name: Build package
         if: steps.check.outputs.skip != 'true'

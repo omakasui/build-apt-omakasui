@@ -1,5 +1,6 @@
 type: repackage
 arch: all
+layer_cache: true
 
 produces:
   - omakub-nvim

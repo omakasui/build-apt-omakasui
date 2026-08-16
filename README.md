@@ -21,6 +21,7 @@ package-name:
 ```yaml
 type: repackage          # build (default) | repackage
 arch: all                 # any (default) | all (amd64-only)
+layer_cache: false        # true → cache Docker layers in CI (see below)
 produces: [omakasui-example]
 distros: [debian13, ubuntu2404]
 ```
@@ -29,6 +30,10 @@ distros: [debian13, ubuntu2404]
 - `repackage` — Dockerfile writes complete `.deb`(s) directly to `/output/`; control fields live in the cloned repo's own `debian/control`.
 
 `ARG VERSION` required in every Dockerfile. `BASE_IMAGE`, `SUITE`, `TARGETARCH` also available.
+
+`layer_cache: true` enables Docker layer caching in CI. Only set it when the Dockerfile pins
+its source to `VERSION` (e.g. `git clone --branch "v${VERSION}"`) — otherwise a cached clone
+layer would freeze the upstream source indefinitely.
 
 ## update-sources.yml
 
