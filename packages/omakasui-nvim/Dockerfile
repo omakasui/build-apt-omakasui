@@ -36,7 +36,8 @@ RUN set -e; \
 
 WORKDIR /build
 
-RUN git clone --depth=1 https://github.com/omakasui/omakasui-nvim.git omakasui-nvim
+RUN git clone --depth=1 --branch "v${VERSION}" \
+      https://github.com/omakasui/omakasui-nvim.git omakasui-nvim
 
 WORKDIR /build/omakasui-nvim
 
