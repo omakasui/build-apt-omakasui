@@ -1,4 +1,4 @@
-type: build
+type: repackage
 arch: all
 
 produces:

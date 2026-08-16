@@ -1,4 +1,4 @@
-# Builds pre-cached LazyVim configurations for all omakasui project variants.
+# Builds omakub-nvim / omadeb-nvim from the omakasui/omakasui-nvim repo.
 # Upstream LazyVim starter: https://github.com/LazyVim/starter
 
 ARG BASE_IMAGE
@@ -11,13 +11,16 @@ ARG TARGETARCH
 ARG SUITE
 
 RUN apt-get update -qq && apt-get install -y --no-install-recommends \
-    curl \
-    ca-certificates \
+    build-essential \
+    dpkg-dev \
+    debhelper \
+    fakeroot \
     git \
+    ca-certificates \
+    curl \
     nodejs \
     npm \
     unzip \
-    build-essential \
   && rm -rf /var/lib/apt/lists/*
 
 RUN npm install -g tree-sitter-cli
@@ -33,58 +36,14 @@ RUN set -e; \
 
 WORKDIR /build
 
-COPY lua/                 lua/
-COPY plugin/              plugin/
-COPY lazyvim.json         lazyvim.json
-COPY setup-nvim.template  setup-nvim.template
+RUN git clone --depth=1 https://github.com/omakasui/omakasui-nvim.git omakasui-nvim
 
-# Download LazyVim starter once — shared across all three variants.
-RUN curl -fsSL \
-    "https://github.com/LazyVim/starter/archive/refs/heads/main.tar.gz" \
-    -o starter.tar.gz && \
-    tar -xzf starter.tar.gz
+WORKDIR /build/omakasui-nvim
 
-ENV HOME=/build/build-home
-ENV XDG_CONFIG_HOME=/build/build-home/.config
-ENV XDG_DATA_HOME=/build/build-home/.local/share
-ENV XDG_STATE_HOME=/build/build-home/.local/state
-ENV XDG_CACHE_HOME=/build/build-home/.cache
+RUN dpkg-buildpackage -b -uc -us
 
-RUN mkdir -p "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" "$XDG_STATE_HOME" "$XDG_CACHE_HOME"
-
-RUN cp -r starter-main "$XDG_CONFIG_HOME/nvim" && \
-    rm -rf "$XDG_CONFIG_HOME/nvim/.git"
-
-RUN cp -r lua/    "$XDG_CONFIG_HOME/nvim/lua/"  && \
-    cp -r plugin/ "$XDG_CONFIG_HOME/nvim/plugin/" && \
-    cp lazyvim.json "$XDG_CONFIG_HOME/nvim/lazyvim.json" && \
-    echo "vim.opt.relativenumber = false" >> "$XDG_CONFIG_HOME/nvim/lua/config/options.lua"
-
-# Pre-cache plugins once — shared by all three variants.
-RUN nvim --headless "+Lazy! sync" "+qa!" || true
-
-RUN set -e; \
-    mkdir -p /output/staged; \
-    for PROJECT in omakub omadeb; do \
-      PKG_NAME="${PROJECT}-nvim"; \
-      SHARE_DIR="/usr/share/${PKG_NAME}"; \
-      STAGED="/output/staged/${PKG_NAME}"; \
-      \
-      # Stage config and data. \
-      mkdir -p "${STAGED}${SHARE_DIR}"; \
-      cp -a "$XDG_CONFIG_HOME/nvim" "${STAGED}${SHARE_DIR}/config"; \
-      cp -a "$XDG_DATA_HOME/nvim"   "${STAGED}${SHARE_DIR}/data"; \
-      rm -rf "${STAGED}${SHARE_DIR}/data/site/"*; \
-      mkdir -p "${STAGED}${SHARE_DIR}/data/site"; \
-      chmod -R 755 "${STAGED}${SHARE_DIR}"; \
-      find "${STAGED}${SHARE_DIR}" -type f -exec chmod 644 {} \;; \
-      \
-      # Instantiate setup script from template via sed. \
-      mkdir -p "${STAGED}/usr/bin"; \
-      SETUP="${STAGED}/usr/bin/${PROJECT}-setup-nvim"; \
-      sed \
-        -e "s|{{PROJECT}}|${PROJECT}|g" \
-        -e "s|{{PKG_NAME}}|${PKG_NAME}|g" \
-        /build/setup-nvim.template > "$SETUP"; \
-      chmod 755 "$SETUP"; \
+RUN mkdir -p /output && \
+    for f in /build/*.deb; do \
+      name=$(dpkg-deb --field "$f" Package); \
+      cp "$f" "/output/${name}_${VERSION}-1+${SUITE}_all.deb"; \
     done
