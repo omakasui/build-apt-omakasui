@@ -1,0 +1,30 @@
+name: Lint
+
+on:
+  pull_request:
+    paths:
+      - 'versions.yml'
+      - 'build-matrix.yml'
+      - 'update-sources.yml'
+      - 'packages/**'
+      - 'scripts/lint.sh'
+      - 'scripts/lib/**'
+      - '.github/workflows/lint.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Validate package definitions
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install yq
+        run: bash scripts/install-yq.sh
+
+      - name: Run lint
+        run: bash scripts/lint.sh
