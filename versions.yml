@@ -5,7 +5,7 @@
 # external: if true, the package is from omakasui/build-apt-packages.
 
 omakasui-devtools:
-  version: "0.0.1"
+  version: "0.0.2"
   depends_on: []
   stable_release: false
   auto_update: true
@@ -22,17 +22,13 @@ omakasui-zellij:
   version: "20260408.1"
   depends_on: []
   auto_update: false
-
 # External Deps (from omakasui/build-packages)
-
 nvim:
   version: "0.12.4"
   depends_on: []
   external: true
   auto_update: true
-
 # Omari core packages (built from omakasui/omari-os)
-
 omakasui-archive-keyring:
   version: "1.0.0"
   depends_on: []
