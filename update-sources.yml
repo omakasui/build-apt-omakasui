@@ -1,0 +1,47 @@
+# Upstream version sources for the periodic auto-update check (scripts/check-updates.sh).
+#
+# upstream:      "github:owner/repo" | "codeberg:owner/repo" | "sibling:owner/repo"
+# "sibling:": use a sibling repo in the same org (omakasui) as the source of truth for the upstream version.
+# tag_prefix:    Strip this from the tag to get the bare version ("" if the tag IS the version).
+# use_tags:      (optional) Use git tags instead of platform Releases
+# external: true here (built in build-apt-packages, not in this repo).
+#
+# Packages not listed here have no upstream to track (auto_update: false in versions.yml).
+
+omakasui-devtools:
+  upstream: "github:omakasui/omakasui-devtools"
+  tag_prefix: "v"
+
+omakasui-nvim:
+  upstream: "github:omakasui/omakasui-nvim"
+  tag_prefix: "v"
+
+omakasui-archive-keyring:
+  upstream: "codeberg:omakasui/omakasui-archive-keyring"
+  tag_prefix: "v"
+  use_tags: true
+
+omari-base-files:
+  upstream: "codeberg:omakasui/omari-base-files"
+  tag_prefix: "v"
+  use_tags: true
+
+omari-meta:
+  upstream: "codeberg:omakasui/omari-meta"
+  tag_prefix: "v"
+  use_tags: true
+
+omari-settings:
+  upstream: "codeberg:omakasui/omari-settings"
+  tag_prefix: "v"
+  use_tags: true
+
+calamares-settings-omari:
+  upstream: "codeberg:omakasui/calamares-settings-omari"
+  tag_prefix: "v"
+  use_tags: true
+
+# External dep, sourced from omakasui/build-apt-packages, not built here.
+nvim:
+  upstream: "sibling:omakasui/build-apt-packages"
+  tag_prefix: "nvim-"

@@ -62,6 +62,10 @@ shell: ## Shell into the build container  (PKG= required, DISTRO= ARCH= optional
 		"packages/$(PKG)/"; \
 	docker run --rm -it --platform "linux/$(ARCH)" "$${IMAGE}" /bin/bash
 
+.PHONY: check-updates
+check-updates: ## Check for new upstream releases and open PRs  (PKG= optional)
+	@$(if $(PKG),CHECK_SINGLE_PACKAGE=$(PKG)) $(SCRIPTS)/check-updates.sh
+
 .PHONY: clean
 clean: ## Remove local build output (output/)
 	@rm -rf output/
