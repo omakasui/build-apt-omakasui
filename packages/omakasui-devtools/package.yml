@@ -1,0 +1,11 @@
+type: repackage
+arch: all
+
+produces:
+  - omakub-devtools
+  - omadeb-devtools
+
+distros:
+  - debian13
+  - ubuntu2404
+  - ubuntu2604
