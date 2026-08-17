@@ -3,6 +3,7 @@ arch: all
 layer_cache: true
 
 produces:
+  - omakasui-nvim
   - omakub-nvim
   - omadeb-nvim
 
