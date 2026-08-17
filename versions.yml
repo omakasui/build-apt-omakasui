@@ -19,9 +19,9 @@ omakasui-walker:
   depends_on: []
   auto_update: false
 omakasui-zellij:
-  version: "20260408.1"
+  version: "0.0.1"
   depends_on: []
-  auto_update: false
+  auto_update: true
 # External Deps (from omakasui/build-packages)
 nvim:
   version: "0.12.4"

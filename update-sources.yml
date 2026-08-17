@@ -16,6 +16,10 @@ omakasui-nvim:
   upstream: "github:omakasui/omakasui-nvim"
   tag_prefix: "v"
 
+omakasui-zellij:
+  upstream: "github:omakasui/omakasui-zellij"
+  tag_prefix: "v"
+
 omakasui-archive-keyring:
   upstream: "codeberg:omakasui/omakasui-archive-keyring"
   tag_prefix: "v"

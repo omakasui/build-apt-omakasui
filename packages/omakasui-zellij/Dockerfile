@@ -1,4 +1,5 @@
-# Packages the zellij configuration for omakasui variants.
+# Builds omakasui-zellij / omakub-zellij / omadeb-zellij from the
+# omakasui/omakasui-zellij repo.
 # Upstream: https://github.com/zellij-org/zellij
 
 ARG BASE_IMAGE
@@ -7,30 +8,26 @@ FROM ${BASE_IMAGE:-debian:trixie-slim}
 ARG VERSION
 ARG SUITE
 
+RUN apt-get update -qq && apt-get install -y --no-install-recommends \
+    build-essential \
+    dpkg-dev \
+    debhelper \
+    fakeroot \
+    git \
+    ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /build
 
-COPY config.kdl            config.kdl
-COPY setup-zellij.template setup-zellij.template
+RUN git clone --depth=1 --branch "v${VERSION}" \
+      https://github.com/omakasui/omakasui-zellij.git omakasui-zellij
 
-RUN set -e; \
-    mkdir -p /output/staged; \
-    for PROJECT in omakub omadeb; do \
-      PKG_NAME="${PROJECT}-zellij"; \
-      SHARE_DIR="/usr/share/${PKG_NAME}"; \
-      STAGED="/output/staged/${PKG_NAME}"; \
-      \
-      # Stage config. \
-      mkdir -p "${STAGED}${SHARE_DIR}/config"; \
-      cp config.kdl "${STAGED}${SHARE_DIR}/config/config.kdl"; \
-      chmod -R 755 "${STAGED}${SHARE_DIR}"; \
-      find "${STAGED}${SHARE_DIR}" -type f -exec chmod 644 {} \;; \
-      \
-      # Instantiate setup script from template. \
-      mkdir -p "${STAGED}/usr/bin"; \
-      SETUP="${STAGED}/usr/bin/${PROJECT}-setup-zellij"; \
-      sed \
-        -e "s|{{PROJECT}}|${PROJECT}|g" \
-        -e "s|{{PKG_NAME}}|${PKG_NAME}|g" \
-        /build/setup-zellij.template > "$SETUP"; \
-      chmod 755 "$SETUP"; \
+WORKDIR /build/omakasui-zellij
+
+RUN dpkg-buildpackage -b -uc -us
+
+RUN mkdir -p /output && \
+    for f in /build/*.deb; do \
+      name=$(dpkg-deb --field "$f" Package); \
+      cp "$f" "/output/${name}_${VERSION}-1+${SUITE}_all.deb"; \
     done

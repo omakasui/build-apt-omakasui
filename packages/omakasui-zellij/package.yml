@@ -1,7 +1,9 @@
-type: build
+type: repackage
 arch: all
+layer_cache: true
 
 produces:
+  - omakasui-zellij
   - omakub-zellij
   - omadeb-zellij
 
