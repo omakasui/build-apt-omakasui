@@ -17,7 +17,8 @@ RUN apt-get update -qq && apt-get install -y --no-install-recommends \
 
 WORKDIR /build
 
-RUN git clone --depth=1 https://github.com/omakasui/omakasui-devtools.git omakasui-devtools
+RUN git clone --depth=1 --branch "v${VERSION}" \
+      https://github.com/omakasui/omakasui-devtools.git omakasui-devtools
 
 WORKDIR /build/omakasui-devtools
 
