@@ -24,7 +24,7 @@ omakasui-zellij:
   auto_update: true
 # External Deps (from omakasui/build-packages)
 nvim:
-  version: "0.12.4"
+  version: "0.12.5"
   depends_on: []
   external: true
   auto_update: true
