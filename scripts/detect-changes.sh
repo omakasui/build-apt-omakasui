@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # detect-changes.sh — Detect changed packages and emit CI matrices.
-# Usage: detect-changes.sh --mode push|dispatch|distro|all [--package <name>] [--distro <name>]
-# Note: entries with external: true in versions.yml are never built and are always skipped.
+# Usage: detect-changes.sh --mode push|dispatch|distro [--package <name>] [--distro <name>]
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib/common.sh
@@ -24,9 +23,9 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-[[ -z "$MODE" ]] && die "--mode is required (push, dispatch, distro, or all)"
+[[ -z "$MODE" ]] && die "--mode is required (push, dispatch, or distro)"
 
-cd "$(repo_root)"
+cd "$(repo_root)" || die "cannot enter repo root"
 
 _output() {
   if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
@@ -36,16 +35,10 @@ _output() {
   fi
 }
 
-_is_external() {
-  local pkg="$1"
-  yq e ".${pkg}.external // false" versions.yml 2>/dev/null || echo false
-}
-
 if [[ "$MODE" == "all" ]]; then
-  # Rebuild every non-external package across every distro.
   PACKAGES=""
   while IFS= read -r pkg; do
-    [[ "$(_is_external "$pkg")" == "true" ]] && continue
+    [[ "$(is_external "$pkg")" == "true" ]] && continue
     PACKAGES="$PACKAGES $pkg"
   done < <(pkg_all_keys)
   PACKAGES=$(echo "$PACKAGES" | xargs)
@@ -53,7 +46,7 @@ elif [[ "$MODE" == "distro" ]]; then
   [[ -z "$FILTER_DISTRO" ]] && die "--distro is required for distro mode"
   PACKAGES=""
   while IFS= read -r pkg; do
-    [[ "$(_is_external "$pkg")" == "true" ]] && continue
+    [[ "$(is_external "$pkg")" == "true" ]] && continue
     if pkg_distros "$pkg" | grep -qx "$FILTER_DISTRO"; then
       PACKAGES="$PACKAGES $pkg"
     fi
@@ -61,6 +54,8 @@ elif [[ "$MODE" == "distro" ]]; then
   PACKAGES=$(echo "$PACKAGES" | xargs)
 elif [[ "$MODE" == "dispatch" ]]; then
   [[ -z "$MANUAL_PKG" ]] && die "--package is required for dispatch mode"
+  [[ "$(is_external "$MANUAL_PKG")" == "true" ]] && \
+    die "${MANUAL_PKG} is external — it is built in the sibling repo, not here."
   PACKAGES="$MANUAL_PKG"
 else
   OLD_VERSIONS=$(mktemp)
@@ -70,8 +65,7 @@ else
 
   PACKAGES=""
   while IFS= read -r pkg; do
-    # Skip external deps — they are version-tracked only, not built here.
-    [[ "$(_is_external "$pkg")" == "true" ]] && continue
+    [[ "$(is_external "$pkg")" == "true" ]] && continue
     OLD_VER=$(yq e ".${pkg}.version // \"\"" "$OLD_VERSIONS")
     NEW_VER=$(yq e ".${pkg}.version // \"\"" versions.yml)
     if [[ "$OLD_VER" != "$NEW_VER" ]]; then
@@ -105,12 +99,6 @@ BUILDS='[]'
 FLAT_MATRIX='[]'
 
 for PKG in $PACKAGES; do
-  # Safety guard: skip external packages if they slip through (e.g. manual dispatch).
-  if [[ "$(_is_external "$PKG")" == "true" ]]; then
-    warn "${PKG} is an external dep — skipping."
-    continue
-  fi
-
   VERSION=$(yq e ".${PKG}.version // \"\"" versions.yml)
   if [[ -z "$VERSION" || "$VERSION" == "null" ]]; then
     warn "${PKG} not found in versions.yml, skipping."

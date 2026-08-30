@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 # lint.sh — Validate package definitions and optionally run lintian.
 # Usage: lint.sh [<package>] [--lintian]
-# Note: entries with external: true in versions.yml are skipped.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib/common.sh
 source "${SCRIPT_DIR}/lib/common.sh"
+# shellcheck source=lib/metadata.sh
+source "${SCRIPT_DIR}/lib/metadata.sh"
 
 require_cmd yq
 
@@ -24,10 +25,13 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-cd "${REPO_ROOT}"
+cd "${REPO_ROOT}" || die "cannot enter ${REPO_ROOT}"
 
 ERRORS=0
 CHECKED=0
+
+# A warning that doesn't bump the counter would let the lint pass silently.
+fail() { warn "$*"; ERRORS=$((ERRORS + 1)); }
 
 lint_one() {
   local key="$1"
@@ -40,34 +44,56 @@ lint_one() {
   local ver
   ver=$(yq e ".${key}.version // \"\"" versions.yml)
   if [[ -z "$ver" || "$ver" == "null" ]]; then
-    warn "${key}: missing from versions.yml"
-    ERRORS=$((ERRORS + 1)); return
+    fail "${key}: missing from versions.yml"; return
   fi
 
   if [[ ! -f "$pkg_yaml" ]]; then
-    warn "${key}: missing package.yml"
-    ERRORS=$((ERRORS + 1)); return
+    fail "${key}: missing package.yml"; return
   fi
 
   local pkg_type
   pkg_type=$(yq e '.type // "build"' "$pkg_yaml")
 
-  if [[ ! -f "${pkg_dir}/Dockerfile" ]]; then
-    warn "${key}: missing Dockerfile"
-    ERRORS=$((ERRORS + 1))
+  # Passthrough packages require debian/ but no Dockerfile.
+  if [[ "$pkg_type" == "passthrough" ]]; then
+    [[ -f "${pkg_dir}/Dockerfile" ]] && \
+      warn "${key}: has a Dockerfile but type is passthrough — Dockerfile is unused"
+    if [[ ! -d "$debian_dir" || ! -f "${debian_dir}/control" ]]; then
+      fail "${key}: type=passthrough requires debian/control"
+    fi
+    if [[ -z "$(yq e '.source.url // .source.url_amd64 // ""' "$pkg_yaml")" ]]; then
+      fail "${key}: type=passthrough requires source.url or source.url_<arch> in package.yml"
+    fi
+  else
+    if [[ ! -f "${pkg_dir}/Dockerfile" ]]; then
+      fail "${key}: missing Dockerfile"
+    fi
   fi
 
-  # Packages with debian/ directory: validate control template fields.
+  # Packages with debian/ directory: validate control template/overlay fields.
   if [[ -d "$debian_dir" && -f "${debian_dir}/control" ]]; then
-    for field in Package Architecture Maintainer Description; do
-      if ! grep -q "^${field}:" "${debian_dir}/control"; then
-        warn "${key}: debian/control missing required field '${field}'"
-        ERRORS=$((ERRORS + 1))
-      fi
-    done
+    if [[ "$pkg_type" == "passthrough" ]]; then
+      # Passthrough uses an overlay — only Maintainer and Version are required.
+      for field in Maintainer Version; do
+        if ! grep -q "^${field}:" "${debian_dir}/control"; then
+          fail "${key}: debian/control overlay missing required field '${field}'"
+        fi
+      done
+    else
+      # build/repackage use a full template — all mandatory fields required.
+      for field in Package Architecture Maintainer Description; do
+        if ! grep -q "^${field}:" "${debian_dir}/control"; then
+          fail "${key}: debian/control missing required field '${field}'"
+        fi
+      done
+    fi
     if ! grep -q '@VERSION@' "${debian_dir}/control"; then
-      warn "${key}: debian/control has no @VERSION@ placeholder"
-      ERRORS=$((ERRORS + 1))
+      fail "${key}: debian/control has no @VERSION@ placeholder"
+    fi
+    # @SHLIBS_DEPENDS@ is resolved by running dpkg-shlibdeps inside the image.
+    if grep -q '@SHLIBS_DEPENDS@' "${debian_dir}/control" && \
+       ! grep -q 'dpkg-dev' "${pkg_dir}/Dockerfile" 2>/dev/null; then
+      fail "${key}: debian/control uses @SHLIBS_DEPENDS@ but Dockerfile lacks dpkg-dev"
     fi
     [[ ! -f "${debian_dir}/changelog" ]] && \
       warn "${key}: debian/changelog missing (required for Debian Policy §12.7)"
@@ -76,26 +102,30 @@ lint_one() {
   else
     # No debian/ dir: only valid for type:repackage (Docker-assembled) packages.
     if [[ "$pkg_type" == "build" ]]; then
-      warn "${key}: type=build requires a debian/ directory"
-      ERRORS=$((ERRORS + 1))
+      fail "${key}: type=build requires a debian/ directory"
     fi
   fi
 
   local distro_count valid_distros
   distro_count=$(yq e '.distros | length' "$pkg_yaml" 2>/dev/null || echo 0)
   if [[ "$distro_count" == "0" || "$distro_count" == "null" ]]; then
-    warn "${key}: no distros declared in package.yml"
-    ERRORS=$((ERRORS + 1))
+    fail "${key}: no distros declared in package.yml"
   fi
 
   valid_distros=$(yq e '.distros | keys | .[]' build-matrix.yml | tr '\n' ' ')
   while IFS= read -r distro; do
     [[ -z "$distro" ]] && continue
     if ! grep -qw "$distro" <<< "$valid_distros"; then
-      warn "${key}: distro '${distro}' not in build-matrix.yml"
-      ERRORS=$((ERRORS + 1))
+      fail "${key}: distro '${distro}' not in build-matrix.yml"
     fi
   done < <(yq e '.distros // [] | .[]' "$pkg_yaml")
+
+  # Catch typos in optional fields, which would otherwise be ignored silently.
+  local unknown
+  unknown=$(yq e 'keys | .[]' "$pkg_yaml" | grep -vxE 'type|arch|produces|distros|source|layer_cache' || true)
+  if [[ -n "$unknown" ]]; then
+    fail "${key}: unknown package.yml field(s): $(echo "$unknown" | tr '\n' ' ')"
+  fi
 
   local deps_csv
   deps_csv=$(yq e ".${key}.depends_on | join(\",\")" versions.yml)
@@ -103,13 +133,10 @@ lint_one() {
     IFS=',' read -ra deps <<< "$deps_csv"
     for dep in "${deps[@]}"; do
       [[ -z "$dep" ]] && continue
-      # Skip directory check for external deps (they live in build-apt-packages).
-      local dep_external
-      dep_external=$(yq e ".${dep}.external // false" versions.yml 2>/dev/null || echo false)
-      [[ "$dep_external" == "true" ]] && continue
+      # An external dep has no package dir here: it is built in the sibling repo.
+      [[ "$(is_external "$dep")" == "true" ]] && continue
       if [[ ! -d "packages/${dep}" ]]; then
-        warn "${key}: depends_on '${dep}' has no packages/${dep}/ directory"
-        ERRORS=$((ERRORS + 1))
+        fail "${key}: depends_on '${dep}' has no packages/${dep}/ directory"
       fi
     done
   fi
@@ -119,9 +146,7 @@ if [[ -n "$PKG_FILTER" ]]; then
   lint_one "$PKG_FILTER"
 else
   while IFS= read -r key; do
-    # Skip external deps — they are version-tracked only, not built here.
-    local_external=$(yq e ".${key}.external // false" versions.yml 2>/dev/null || echo false)
-    [[ "$local_external" == "true" ]] && continue
+    [[ "$(is_external "$key")" == "true" ]] && continue
     lint_one "$key"
   done < <(yq e 'keys | .[]' versions.yml)
 fi

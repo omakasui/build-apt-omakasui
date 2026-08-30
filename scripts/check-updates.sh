@@ -1,18 +1,20 @@
 #!/usr/bin/env bash
 # check-updates.sh — Check upstream releases for all packages and open one PR per update.
 
-set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/common.sh
+source "${SCRIPT_DIR}/lib/common.sh"
 
 # Ensure mikefarah yq v4 takes precedence over Python yq or other variants.
 export PATH="/usr/local/bin:$PATH"
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VERSIONS_FILE="$REPO_ROOT/versions.yml"
 SOURCES_FILE="$REPO_ROOT/update-sources.yml"
 
+# Prefixed variants; note() rather than info() so it doesn't shadow common.sh.
 log()  { echo "[check-updates] $*"; }
 skip() { echo "[check-updates] SKIP $1 — $2"; }
-info() { echo "[check-updates] INFO $1 — $2"; }
+note() { echo "[check-updates] INFO $1 — $2"; }
 
 github_latest_release() {
   gh api "repos/$1/releases/latest" 2>/dev/null | jq -r '.tag_name // empty' 2>/dev/null || true
@@ -36,20 +38,23 @@ github_latest_tag() {
   gh api "repos/$1/tags?per_page=1" 2>/dev/null | jq -r '.[0].name // empty' 2>/dev/null || true
 }
 
+gitlab_latest_release() {
+  curl -fsSL "https://gitlab.com/api/v4/projects/${1//\//%2F}/releases?per_page=1" \
+    | jq -r '.[0].tag_name // empty' 2>/dev/null || true
+}
+
 codeberg_latest_release() {
   curl -fsSL "https://codeberg.org/api/v1/repos/$1/releases?limit=1" \
     | jq -r '.[0].tag_name // empty' 2>/dev/null || true
 }
 
-# For Codeberg repos that publish tags instead of Releases.
 codeberg_latest_tag() {
   curl -fsSL "https://codeberg.org/api/v1/repos/$1/tags?limit=1" \
     | jq -r '.[0].name // empty' 2>/dev/null || true
 }
 
-# For packages that are external: true here — built and released in the sibling
-# omakasui/build-apt-packages repo instead. Mirrors the resolution scripts/build.sh
-# already uses for external depends_on entries.
+# For entries marked external: true — built and released in the sibling repo,
+# tracked here only so dependents can resolve a version.
 sibling_repo_latest_release() {
   local owner_repo="$1" prefix="$2"
   gh release list --repo "$owner_repo" \
@@ -69,11 +74,6 @@ create_pr() {
   local pkg="$1" current="$2" new_ver="$3" upstream="$4"
   local branch="auto-update/${pkg}/${new_ver}"
   local existing release_url owner_repo
-
-  if [[ "${DRY_RUN:-false}" == "true" ]]; then
-    log "$pkg: [DRY RUN] would bump ${current} → ${new_ver} and open a PR (branch: ${branch})"
-    return 0
-  fi
 
   existing=$(gh pr list --head "$branch" --json number --jq '.[0].number' 2>/dev/null || true)
   if [[ -n "$existing" ]]; then
@@ -114,6 +114,9 @@ create_pr() {
   if [[ "$upstream" == github:* ]]; then
     owner_repo="${upstream#github:}"
     release_url="https://github.com/${owner_repo}/releases"
+  elif [[ "$upstream" == gitlab:* ]]; then
+    owner_repo="${upstream#gitlab:}"
+    release_url="https://gitlab.com/${owner_repo}/-/releases"
   elif [[ "$upstream" == codeberg:* ]]; then
     owner_repo="${upstream#codeberg:}"
     release_url="https://codeberg.org/${owner_repo}/releases"
@@ -132,20 +135,19 @@ create_pr() {
 
 This only updates the tracking field in \`versions.yml\` — \`${pkg}\` is \`external: true\` and is never built here.
 
-**Action needed:** dependents of \`${pkg}\` (see \`depends_on\` in versions.yml) are NOT rebuilt automatically by this PR. If you want them to pick up the new \`${pkg}\`, trigger **Build package** manually (workflow_dispatch) for the dependent package after merging.
+**Action needed:** dependents of \`${pkg}\` (see \`depends_on\`) are NOT rebuilt by this PR. Trigger **Build package** manually for them after merging.
 
 **Release notes:** ${release_url}
 
 ---
-*Created automatically by the [update check](../../actions/workflows/check-updates.yml).*
-*Only \`versions.yml\` is changed — merging triggers the build workflow.*"
+*Created automatically by the [update check](../../actions/workflows/check-updates.yml).*"
   else
     body="Automated version bump for \`${pkg}\`: \`${current}\` → \`${new_ver}\`.
 
 **Release notes:** ${release_url}
 
 ---
-*Created automatically by the [update check](../../actions/workflows/check-updates.yml).*
+*Created automatically by the [daily update check](../../actions/workflows/check-updates.yml).*
 *Only \`versions.yml\` is changed — merging triggers the build workflow.*"
   fi
 
@@ -199,6 +201,8 @@ for pkg in $PACKAGES; do
 
   upstream=$(yq e ".${pkg}.upstream" "$SOURCES_FILE")
   tag_prefix=$(yq e ".${pkg}.tag_prefix" "$SOURCES_FILE")
+  filter_releases=$(yq e ".${pkg}.filter_releases // false" "$SOURCES_FILE")
+  use_prerelease=$(yq e ".${pkg}.prerelease // false" "$SOURCES_FILE")
   use_tags=$(yq e ".${pkg}.use_tags // false" "$SOURCES_FILE")
 
   # Strip surrounding quotes added by yq.
@@ -217,11 +221,18 @@ for pkg in $PACKAGES; do
 
   if [[ "$upstream" == github:* ]]; then
     owner_repo="${upstream#github:}"
-    if [[ "$use_tags" == "true" ]]; then
+    if [[ "$filter_releases" == "true" ]]; then
+      raw_tag=$(github_latest_release_filtered "$owner_repo" "$tag_prefix")
+    elif [[ "$use_tags" == "true" ]]; then
       raw_tag=$(github_latest_tag "$owner_repo")
+    elif [[ "$use_prerelease" == "true" ]]; then
+      raw_tag=$(github_latest_release_prerelease "$owner_repo")
     else
       raw_tag=$(github_latest_release "$owner_repo")
     fi
+  elif [[ "$upstream" == gitlab:* ]]; then
+    owner_repo="${upstream#gitlab:}"
+    raw_tag=$(gitlab_latest_release "$owner_repo")
   elif [[ "$upstream" == codeberg:* ]]; then
     owner_repo="${upstream#codeberg:}"
     if [[ "$use_tags" == "true" ]]; then
@@ -238,19 +249,19 @@ for pkg in $PACKAGES; do
   fi
 
   if [[ -z "$raw_tag" || "$raw_tag" == "null" ]]; then
-    info "$pkg" "could not fetch latest release tag"
+    note "$pkg" "could not fetch latest release tag"
     continue
   fi
 
   new_ver="${raw_tag#"$tag_prefix"}"
 
   if [[ -z "$new_ver" ]]; then
-    info "$pkg" "tag '${raw_tag}' with prefix '${tag_prefix}' yielded empty version — skipping"
+    note "$pkg" "tag '${raw_tag}' with prefix '${tag_prefix}' yielded empty version — skipping"
     continue
   fi
 
   if [[ "$new_ver" == "$current" ]]; then
-    info "$pkg" "already at latest (${current})"
+    note "$pkg" "already at latest (${current})"
     continue
   fi
 

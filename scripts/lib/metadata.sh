@@ -16,8 +16,14 @@ pkg_all_keys() {
   yq e 'keys | .[]' "$(repo_root)/versions.yml"
 }
 
+# external: version-tracked here, built and released in the sibling repo.
+is_external() {
+  yq e ".${1}.external // false" "$(repo_root)/versions.yml" 2>/dev/null || echo false
+}
+
 _pkg_yaml() {
-  local f="$(repo_root)/packages/${1}/package.yml"
+  local f
+  f="$(repo_root)/packages/${1}/package.yml"
   [[ -f "$f" ]] || die "packages/${1}/package.yml not found"
   echo "$f"
 }
@@ -31,8 +37,9 @@ pkg_field() {
   echo "$val"
 }
 
-pkg_type() { pkg_field "$1" '.type // "build"'; }
-pkg_arch() { pkg_field "$1" '.arch // ""'; }
+pkg_type()        { pkg_field "$1" '.type // "build"'; }
+pkg_arch()        { pkg_field "$1" '.arch // ""'; }
+pkg_layer_cache() { pkg_field "$1" '.layer_cache // false' "false"; }
 
 pkg_produces() {
   local yaml
@@ -52,9 +59,27 @@ pkg_distros() {
   yq e '.distros[]' "$yaml"
 }
 
+# Arch-specific URL wins over the generic one. Passthrough packages only.
+pkg_source_url() {
+  local yaml url
+  yaml=$(_pkg_yaml "$1")
+  url=$(yq e ".source.url_${2} // \"\"" "$yaml")
+  [[ -z "$url" || "$url" == "null" ]] && url=$(yq e '.source.url // ""' "$yaml")
+  [[ -n "$url" && "$url" != "null" ]] || \
+    die "No source URL in ${yaml}. Set source.url or source.url_${2}."
+  echo "$url"
+}
+
 matrix_base_image() {
   local val
   val=$(yq e ".distros.${1}.base_image // \"\"" "$(repo_root)/build-matrix.yml")
+  [[ -n "$val" && "$val" != "null" ]] || die "distro '${1}' not found in build-matrix.yml"
+  echo "$val"
+}
+
+matrix_suite() {
+  local val
+  val=$(yq e ".distros.${1}.suite // \"\"" "$(repo_root)/build-matrix.yml")
   [[ -n "$val" && "$val" != "null" ]] || die "distro '${1}' not found in build-matrix.yml"
   echo "$val"
 }

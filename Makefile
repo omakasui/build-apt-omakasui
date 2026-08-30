@@ -16,9 +16,13 @@ help: ## Show this help
 .PHONY: build
 build: ## Build a package locally  (PKG= required, DISTRO= ARCH= optional)
 	$(call _require_pkg)
-	@$(SCRIPTS)/build.sh $(PKG) \
-		$(if $(DISTRO),--distro $(DISTRO)) \
-		$(if $(filter-out amd64,$(ARCH)),--arch $(ARCH))
+	@TYPE=$$(yq e '.type // "build"' packages/$(PKG)/package.yml); \
+	ARGS="$(PKG) $(if $(DISTRO),--distro $(DISTRO)) $(if $(filter-out amd64,$(ARCH)),--arch $(ARCH))"; \
+	if [[ "$$TYPE" == "passthrough" ]]; then \
+		$(SCRIPTS)/passthrough.sh $$ARGS; \
+	else \
+		$(SCRIPTS)/build.sh $$ARGS; \
+	fi
 
 .PHONY: lint
 lint: ## Validate package definitions  (PKG= optional)
@@ -29,9 +33,8 @@ lintian: ## Run lintian on built output  (PKG= optional, requires prior 'make bu
 	@$(SCRIPTS)/lint.sh $(PKG) --lintian
 
 .PHONY: list
-list: ## List all packages with their versions
-	@yq e 'to_entries | .[] | .key + "  " + .value.version' versions.yml | \
-		column -t -s '  '
+list: ## List all packages and versions
+	@yq e 'to_entries | .[] | .key + "  " + .value.version' versions.yml | column -t -s '  '
 
 .PHONY: info
 info: ## Show package metadata  (PKG= required)
@@ -43,21 +46,27 @@ info: ## Show package metadata  (PKG= required)
 	echo "Arch     : $$(yq e '.arch // "any"' packages/$(PKG)/package.yml)"; \
 	echo "Distros  : $$(yq e '.distros | join(", ")' packages/$(PKG)/package.yml)"; \
 	echo "Deps     : $$(yq e '.$(PKG).depends_on // [] | join(", ")' versions.yml)"; \
-	echo "Homepage : $$(grep '^Homepage:' packages/$(PKG)/debian/control 2>/dev/null | head -1 | awk '{print $$2}')"; \
+	echo "Homepage : $$(grep '^Homepage:' packages/$(PKG)/debian/control packages/$(PKG)/packaging/control 2>/dev/null | head -1 | awk '{print $$2}')"; \
 	echo ""
 
 .PHONY: shell
 shell: ## Shell into the build container  (PKG= required, DISTRO= ARCH= optional)
 	$(call _require_pkg)
-	@VERSION=$$(yq e '.$(PKG).version' versions.yml); \
+	@TYPE=$$(yq e '.type // "build"' packages/$(PKG)/package.yml); \
+	if [[ "$$TYPE" == "passthrough" ]]; then \
+		echo "Error: $(PKG) is type:passthrough — no Docker container."; exit 1; \
+	fi; \
+	VERSION=$$(yq e '.$(PKG).version' versions.yml); \
 	DISTRO_VAL=$${DISTRO:-$$(yq e '.distros | keys | .[0]' build-matrix.yml)}; \
 	BASE=$$(yq e ".distros.$${DISTRO_VAL}.base_image" build-matrix.yml); \
+	SUITE=$$(yq e ".distros.$${DISTRO_VAL}.suite" build-matrix.yml); \
 	IMAGE="omakasui-build-$(PKG):local"; \
 	docker buildx build \
 		--platform "linux/$(ARCH)" \
 		--load \
 		--build-arg "BASE_IMAGE=$${BASE}" \
 		--build-arg "VERSION=$${VERSION}" \
+		--build-arg "SUITE=$${SUITE}" \
 		--tag "$${IMAGE}" \
 		"packages/$(PKG)/"; \
 	docker run --rm -it --platform "linux/$(ARCH)" "$${IMAGE}" /bin/bash
@@ -67,15 +76,11 @@ check-updates: ## Check for new upstream releases and open PRs  (PKG= optional)
 	@$(if $(PKG),CHECK_SINGLE_PACKAGE=$(PKG)) $(SCRIPTS)/check-updates.sh
 
 .PHONY: clean
-clean: ## Remove local build output (output/)
-	@rm -rf output/
-	@echo "Cleaned output/"
+clean: ## Remove build output (output/)
+	@rm -rf output/ && echo "Cleaned output/"
 
 .PHONY: clean-images
 clean-images: ## Remove all omakasui-build-* Docker images
 	@images=$$(docker images --format '{{.Repository}}:{{.Tag}}' | grep '^omakasui-build-' || true); \
-	if [[ -n "$$images" ]]; then \
-		echo "$$images" | xargs docker rmi; \
-	else \
-		echo "No omakasui-build images found."; \
-	fi
+	if [[ -n "$$images" ]]; then echo "$$images" | xargs docker rmi; \
+	else echo "No omakasui-build images found."; fi
