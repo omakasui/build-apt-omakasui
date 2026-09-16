@@ -4,5 +4,7 @@ arch: all
 produces:
   - omari-settings
 
-distros:
-  - debian13
+publications:
+  omari:
+    produces:
+      - omari-settings

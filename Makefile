@@ -2,7 +2,8 @@ SHELL   := /bin/bash
 .DEFAULT_GOAL := help
 
 PKG     ?=
-DISTRO  ?=
+PLATFORM ?=
+DISTRO   ?= # Deprecated alias for PLATFORM.
 ARCH    ?= amd64
 SCRIPTS := scripts
 
@@ -14,10 +15,10 @@ help: ## Show this help
 		awk 'BEGIN {FS = ":.*##"}; {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
 
 .PHONY: build
-build: ## Build a package locally  (PKG= required, DISTRO= ARCH= optional)
+build: ## Build a package locally  (PKG= required, PLATFORM= ARCH= optional)
 	$(call _require_pkg)
 	@TYPE=$$(yq e '.type // "build"' packages/$(PKG)/package.yml); \
-	ARGS="$(PKG) $(if $(DISTRO),--distro $(DISTRO)) $(if $(filter-out amd64,$(ARCH)),--arch $(ARCH))"; \
+	ARGS="$(PKG) $(if $(or $(PLATFORM),$(DISTRO)),--platform $(or $(PLATFORM),$(DISTRO))) $(if $(filter-out amd64,$(ARCH)),--arch $(ARCH))"; \
 	if [[ "$$TYPE" == "passthrough" ]]; then \
 		$(SCRIPTS)/passthrough.sh $$ARGS; \
 	else \
@@ -44,22 +45,22 @@ info: ## Show package metadata  (PKG= required)
 	echo "Version  : $$(yq e '.$(PKG).version' versions.yml)"; \
 	echo "Type     : $$(yq e '.type // "build"' packages/$(PKG)/package.yml)"; \
 	echo "Arch     : $$(yq e '.arch // "any"' packages/$(PKG)/package.yml)"; \
-	echo "Distros  : $$(yq e '.distros | join(", ")' packages/$(PKG)/package.yml)"; \
+	echo "Products : $$(yq e '.publications | keys | join(", ")' packages/$(PKG)/package.yml)"; \
 	echo "Deps     : $$(yq e '.$(PKG).depends_on // [] | join(", ")' versions.yml)"; \
 	echo "Homepage : $$(grep '^Homepage:' packages/$(PKG)/debian/control packages/$(PKG)/packaging/control 2>/dev/null | head -1 | awk '{print $$2}')"; \
 	echo ""
 
 .PHONY: shell
-shell: ## Shell into the build container  (PKG= required, DISTRO= ARCH= optional)
+shell: ## Shell into the build container  (PKG= required, PLATFORM= ARCH= optional)
 	$(call _require_pkg)
 	@TYPE=$$(yq e '.type // "build"' packages/$(PKG)/package.yml); \
 	if [[ "$$TYPE" == "passthrough" ]]; then \
 		echo "Error: $(PKG) is type:passthrough — no Docker container."; exit 1; \
 	fi; \
 	VERSION=$$(yq e '.$(PKG).version' versions.yml); \
-	DISTRO_VAL=$${DISTRO:-$$(yq e '.distros | keys | .[0]' build-matrix.yml)}; \
-	BASE=$$(yq e ".distros.$${DISTRO_VAL}.base_image" build-matrix.yml); \
-	SUITE=$$(yq e ".distros.$${DISTRO_VAL}.suite" build-matrix.yml); \
+	PLATFORM_VAL=$${PLATFORM:-$${DISTRO:-$$(yq e '.platforms | keys | .[0]' build-matrix.yml)}}; \
+	BASE=$$(yq e ".platforms.$${PLATFORM_VAL}.base_image" build-matrix.yml); \
+	SUITE=$$(yq e ".platforms.$${PLATFORM_VAL}.suite" build-matrix.yml); \
 	IMAGE="omakasui-build-$(PKG):local"; \
 	docker buildx build \
 		--platform "linux/$(ARCH)" \

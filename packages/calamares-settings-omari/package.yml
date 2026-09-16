@@ -4,5 +4,7 @@ arch: all
 produces:
   - calamares-settings-omari
 
-distros:
-  - debian13
+publications:
+  omari:
+    produces:
+      - calamares-settings-omari

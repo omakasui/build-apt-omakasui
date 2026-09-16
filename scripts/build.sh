@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # build.sh — Build a package (type: build or repackage) using Docker.
-# Usage: ./scripts/build.sh <package> [--distro <distro>] [--arch <arch>] [--output-dir <dir>]
+# Usage: ./scripts/build.sh <package> [--platform <platform>] [--arch <arch>] [--output-dir <dir>]
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib/common.sh
@@ -25,9 +25,9 @@ PKG_YAML="${PKG_DIR}/package.yml"
 
 VERSION=$(pkg_version "$PKG")
 
-[[ -z "$DISTRO" ]] && DISTRO=$(matrix_default_distro)
-BASE_IMAGE=$(matrix_base_image "$DISTRO")
-SUITE=$(matrix_suite "$DISTRO")
+[[ -z "$PLATFORM" ]] && PLATFORM=$(matrix_default_platform)
+BASE_IMAGE=$(matrix_base_image "$PLATFORM")
+SUITE=$(matrix_suite "$PLATFORM")
 
 DEPENDS_ON=$(pkg_depends_on "$PKG")
 PKG_TYPE=$(pkg_type "$PKG")
@@ -44,7 +44,7 @@ mkdir -p "$OUTPUT_DIR"
 echo "═══════════════════════════════════════════════════════════"
 echo "  Package : ${PKG}"
 echo "  Version : ${VERSION}"
-echo "  Distro  : ${DISTRO}  (${BASE_IMAGE}, suite=${SUITE})"
+echo "  Platform: ${PLATFORM}  (${BASE_IMAGE}, suite=${SUITE})"
 echo "  Arch    : ${ARCH}  (control: ${CTRL_ARCH})"
 [[ -n "$DEPENDS_ON" && "$DEPENDS_ON" != "null" ]] && echo "  Deps    : ${DEPENDS_ON}"
 echo "  Output  : ${OUTPUT_DIR}"

@@ -4,5 +4,7 @@ arch: all
 produces:
   - omakasui-archive-keyring
 
-distros:
-  - debian13
+publications:
+  omari:
+    produces:
+      - omakasui-archive-keyring

@@ -1,6 +1,6 @@
-# Supported distros and architectures. Keys must match distros[] in package.yml files.
+# Build environments and APT targets.
 
-distros:
+platforms:
   debian13:
     base_image: debian:trixie
     suite: trixie
@@ -21,3 +21,28 @@ distros:
     architectures:
       - amd64
       - arm64
+
+products:
+  omabuntu:
+    label: Omabuntu
+    suites:
+      noble:
+        platform: ubuntu2404
+        status: active
+      resolute:
+        platform: ubuntu2604
+        status: active
+
+  omadeb:
+    label: Omadeb
+    suites:
+      trixie:
+        platform: debian13
+        status: active
+
+  omari:
+    label: Omari
+    suites:
+      trixie:
+        platform: debian13
+        status: active

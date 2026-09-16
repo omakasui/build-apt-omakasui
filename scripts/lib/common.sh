@@ -21,15 +21,15 @@ SCRIPTS_DIR="${REPO_ROOT}/scripts"
 repo_root()   { echo "$REPO_ROOT"; }
 scripts_dir() { echo "$SCRIPTS_DIR"; }
 
-# Shared flags of build.sh and passthrough.sh. Sets PKG, DISTRO, ARCH and
-# OUTPUT_DIR_OVERRIDE. First argument is the caller's $0, used for --help.
+# Parse shared build flags.
 # shellcheck disable=SC2034
 parse_pkg_args() {
   local self="$1"; shift
-  PKG=""; DISTRO=""; ARCH="amd64"; OUTPUT_DIR_OVERRIDE=""
+  PKG=""; PLATFORM=""; DISTRO=""; ARCH="amd64"; OUTPUT_DIR_OVERRIDE=""
   while [[ $# -gt 0 ]]; do
     case "$1" in
-      --distro)     DISTRO="$2";              shift 2 ;;
+      --platform)   PLATFORM="$2";            shift 2 ;;
+      --distro)     PLATFORM="$2";            shift 2 ;; # Deprecated.
       --arch)       ARCH="$2";                shift 2 ;;
       --output-dir) OUTPUT_DIR_OVERRIDE="$2"; shift 2 ;;
       --help|-h)    sed -n '2,/^$/{ s/^# //; s/^#$//; p }' "$self"; exit 0 ;;
@@ -37,7 +37,8 @@ parse_pkg_args() {
       *)            PKG="$1"; shift ;;
     esac
   done
-  [[ -n "$PKG" ]] || die "Usage: $(basename "$self") <package> [--distro <distro>] [--arch <arch>] [--output-dir <dir>]"
+  DISTRO="$PLATFORM" # Deprecated compatibility variable.
+  [[ -n "$PKG" ]] || die "Usage: $(basename "$self") <package> [--platform <platform>] [--arch <arch>] [--output-dir <dir>]"
 }
 
 require_cmd() {

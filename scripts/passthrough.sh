@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # passthrough.sh — Download an upstream .deb and repackage it with debian/ templates.
-# Usage: ./scripts/passthrough.sh <package> [--distro <distro>] [--arch <arch>]
+# Usage: ./scripts/passthrough.sh <package> [--platform <platform>] [--arch <arch>]
 #
 # Requires package.yml to have a 'source' section with the upstream URL:
 #   source:
@@ -34,8 +34,8 @@ DEBIAN_DIR="${PKG_DIR}/debian"
 
 VERSION=$(pkg_version "$PKG")
 
-[[ -z "$DISTRO" ]] && DISTRO=$(matrix_default_distro)
-SUITE=$(matrix_suite "$DISTRO")
+[[ -z "$PLATFORM" ]] && PLATFORM=$(matrix_default_platform)
+SUITE=$(matrix_suite "$PLATFORM")
 
 PKG_ARCH=$(pkg_arch "$PKG")
 if ! CTRL_ARCH=$(deb_control_arch "$PKG_ARCH" "$ARCH"); then
@@ -51,7 +51,7 @@ mapfile -t PRODUCE_NAMES < <(resolve_produces "$PKG" "$PKG_YAML" "${DEBIAN_DIR}/
 echo "═══════════════════════════════════════════════════════════"
 echo "  Package : ${PKG}"
 echo "  Version : ${VERSION}"
-echo "  Distro  : ${DISTRO}  (suite=${SUITE})"
+echo "  Platform: ${PLATFORM}  (suite=${SUITE})"
 echo "  Arch    : ${ARCH}  (control: ${CTRL_ARCH})"
 echo "  URL     : ${SOURCE_URL}"
 echo "═══════════════════════════════════════════════════════════"

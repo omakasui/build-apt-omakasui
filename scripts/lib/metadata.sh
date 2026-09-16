@@ -53,10 +53,16 @@ pkg_produces() {
   fi
 }
 
-pkg_distros() {
+pkg_products() {
   local yaml
   yaml=$(_pkg_yaml "$1")
-  yq e '.distros[]' "$yaml"
+  yq e '.publications | keys | .[]' "$yaml"
+}
+
+pkg_publication_produces() {
+  local yaml
+  yaml=$(_pkg_yaml "$1")
+  yq e ".publications.${2}.produces[]" "$yaml"
 }
 
 # Arch-specific URL wins over the generic one. Passthrough packages only.
@@ -72,26 +78,49 @@ pkg_source_url() {
 
 matrix_base_image() {
   local val
-  val=$(yq e ".distros.${1}.base_image // \"\"" "$(repo_root)/build-matrix.yml")
-  [[ -n "$val" && "$val" != "null" ]] || die "distro '${1}' not found in build-matrix.yml"
+  val=$(yq e ".platforms.${1}.base_image // \"\"" "$(repo_root)/build-matrix.yml")
+  [[ -n "$val" && "$val" != "null" ]] || die "platform '${1}' not found in build-matrix.yml"
   echo "$val"
 }
 
 matrix_suite() {
   local val
-  val=$(yq e ".distros.${1}.suite // \"\"" "$(repo_root)/build-matrix.yml")
-  [[ -n "$val" && "$val" != "null" ]] || die "distro '${1}' not found in build-matrix.yml"
+  val=$(yq e ".platforms.${1}.suite // \"\"" "$(repo_root)/build-matrix.yml")
+  [[ -n "$val" && "$val" != "null" ]] || die "platform '${1}' not found in build-matrix.yml"
   echo "$val"
 }
 
-matrix_default_distro() {
-  yq e '.distros | keys | .[0]' "$(repo_root)/build-matrix.yml"
+matrix_default_platform() {
+  yq e '.platforms | keys | .[0]' "$(repo_root)/build-matrix.yml"
 }
 
-matrix_distro_keys() {
-  yq e '.distros | keys | .[]' "$(repo_root)/build-matrix.yml"
+matrix_platform_keys() {
+  yq e '.platforms | keys | .[]' "$(repo_root)/build-matrix.yml"
 }
 
 matrix_arches() {
-  yq e ".distros.${1}.architectures[]" "$(repo_root)/build-matrix.yml"
+  yq e ".platforms.${1}.architectures[]" "$(repo_root)/build-matrix.yml"
 }
+
+matrix_product_keys() {
+  yq e '.products | keys | .[]' "$(repo_root)/build-matrix.yml"
+}
+
+matrix_product_suites() {
+  yq e ".products.${1}.suites | keys | .[]" "$(repo_root)/build-matrix.yml"
+}
+
+matrix_target_platform() {
+  local val
+  val=$(yq e ".products.${1}.suites.${2}.platform // \"\"" "$(repo_root)/build-matrix.yml")
+  [[ -n "$val" && "$val" != "null" ]] || die "target '${1}/${2}' not found in build-matrix.yml"
+  echo "$val"
+}
+
+matrix_target_status() {
+  yq e ".products.${1}.suites.${2}.status // \"active\"" "$(repo_root)/build-matrix.yml"
+}
+
+# Deprecated aliases.
+matrix_default_distro() { matrix_default_platform; }
+matrix_distro_keys() { matrix_platform_keys; }

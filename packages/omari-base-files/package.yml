@@ -4,5 +4,7 @@ arch: all
 produces:
   - omari-base-files
 
-distros:
-  - debian13
+publications:
+  omari:
+    produces:
+      - omari-base-files
