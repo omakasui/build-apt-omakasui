@@ -154,7 +154,7 @@ jobs:
         uses: docker/setup-buildx-action@v4
       - name: Cache dependency .deb files
         if: steps.check.outputs.skip != 'true'
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: packages/*/deps
           key: deps-${{ matrix.package }}-${{ matrix.platform }}-${{ matrix.arch }}-${{ hashFiles('versions.yml') }}
@@ -194,7 +194,7 @@ jobs:
           pattern: ${{ matrix.package_entry.package }}-*
           merge-multiple: true
       - name: Create or update Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ matrix.package_entry.package }}-${{ matrix.package_entry.version }}
           name: "${{ matrix.package_entry.package }} v${{ matrix.package_entry.version }}"
@@ -245,7 +245,7 @@ jobs:
 
       - name: Cache dependency .deb files
         if: steps.check.outputs.skip != 'true'
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: packages/*/deps
           key: deps-${{ matrix.package }}-${{ matrix.platform }}-${{ matrix.arch }}-${{ hashFiles('versions.yml') }}
@@ -291,7 +291,7 @@ jobs:
           merge-multiple: true
 
       - name: Create or update Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ matrix.package_entry.package }}-${{ matrix.package_entry.version }}
           name: "${{ matrix.package_entry.package }} v${{ matrix.package_entry.version }}"
