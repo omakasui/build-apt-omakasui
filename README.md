@@ -14,7 +14,7 @@ package-name:
   depends_on: []
   stable_release: false
   external: false
-  frozen_suites: []
+  frozen_targets: []
   auto_update: true
 ```
 
@@ -24,7 +24,7 @@ package-name:
 | `depends_on` | `[]` | Sibling keys needed at build time. |
 | `stable_release` | `false` | Set to `true` to also publish to the stable channel. |
 | `external` | `false` | Set to `true` if the package is built in `build-apt-packages` rather than here. |
-| `frozen_suites` | `[]` | Suites to skip. |
+| `frozen_targets` | `[]` | Qualified publication targets to skip, e.g. `omabuntu/noble`. |
 | `auto_update` | `true` | Set to `false` to skip the periodic upstream check. |
 
 ## package.yml
@@ -33,8 +33,10 @@ package-name:
 type: repackage
 arch: all
 layer_cache: false
-produces: [omakasui-example]
-distros: [debian13, ubuntu2404]
+produces: [omakasui-example, omakub-example]
+publications:
+  omabuntu:
+    produces: [omakasui-example, omakub-example]
 ```
 
 | Field | Default | Description |
@@ -43,7 +45,7 @@ distros: [debian13, ubuntu2404]
 | `arch` | `any` | Use `all` for amd64-only packages. |
 | `layer_cache` | `false` | Set to `true` to cache Docker layers in CI. See below. |
 | `produces` | required | Installed names. |
-| `distros` | required | Target distributions. |
+| `publications` | required | Product repositories and the subset of outputs visible in each one. Active suites are expanded from `build-matrix.yml`. |
 
 ### Build types
 
@@ -53,7 +55,7 @@ distros: [debian13, ubuntu2404]
 ### Dockerfile arguments
 
 * `ARG VERSION` is required in every Dockerfile.
-* `BASE_IMAGE`, `SUITE` and `TARGETARCH` are also available.
+* `BASE_IMAGE`, `SUITE` and `TARGETARCH` are also available. Build platforms are independent from publication products.
 
 ### Layer caching
 
@@ -102,9 +104,9 @@ Requires:
 * `qemu-user-static` (arm64 builds only)
 
 ```bash
-make build PKG=aether
-make lint PKG=aether
-make check-updates PKG=aether
+make build PKG=omakasui-nvim PLATFORM=ubuntu2404
+make lint PKG=omakasui-nvim
+make check-updates PKG=omakasui-nvim
 make list
 make clean
 ```

@@ -1,5 +1,4 @@
-# Triggered on versions.yml changes (detects which packages changed) or manually.
-# External deps (external: true in versions.yml) are never built.
+# Build changed internal packages and publish their APT targets.
 name: Build package
 
 on:
@@ -8,24 +7,25 @@ on:
       - main
     paths:
       - 'versions.yml'
+      - 'build-matrix.yml'
+      - 'packages/*/package.yml'
 
   workflow_dispatch:
     inputs:
       package:
-        description: 'Package to build (must exist in versions.yml, must not be external: true). Leave empty when using distro.'
+        description: 'Package to build (must exist in versions.yml, must not be external: true). Leave empty when using product.'
         required: false
         type: string
-      distro:
-        description: 'Build ALL packages for a specific distro (e.g. ubuntu2604). Leave empty when using package.'
+      product:
+        description: 'Build all packages for an isolated product (e.g. omabuntu). Leave empty when using package.'
         required: false
-        type: choice
-        options:
-          - ''
-          - debian13
-          - ubuntu2404
-          - ubuntu2604
+        type: string
+      suite:
+        description: 'Optional suite filter for the selected product (e.g. noble or trixie).'
+        required: false
+        type: string
       rebuild_all:
-        description: 'Rebuild ALL packages for ALL distros (ignores package/distro inputs)'
+        description: 'Rebuild all packages for every active product target (ignores package/product inputs)'
         required: false
         type: boolean
         default: false
@@ -65,8 +65,10 @@ jobs:
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             if [[ "${{ inputs.rebuild_all }}" == "true" ]]; then
               bash scripts/detect-changes.sh --mode all
-            elif [[ -n "${{ inputs.distro }}" ]]; then
-              bash scripts/detect-changes.sh --mode distro --distro "${{ inputs.distro }}"
+            elif [[ -n "${{ inputs.product }}" ]]; then
+              ARGS=(--mode product --product "${{ inputs.product }}")
+              [[ -z "${{ inputs.suite }}" ]] || ARGS+=(--suite "${{ inputs.suite }}")
+              bash scripts/detect-changes.sh "${ARGS[@]}"
             else
               bash scripts/detect-changes.sh --mode dispatch --package "${{ inputs.package }}"
             fi
@@ -78,7 +80,7 @@ jobs:
         id: core
         if: inputs.package == ''
         run: |
-          # Packages listed as depends_on targets — must be released before dependents build.
+          # Release internal dependencies first.
           CORE_PKGS=$(yq e '.[] | select(.depends_on | length > 0) | .depends_on[]' \
             versions.yml 2>/dev/null | sort -u | xargs)
 
@@ -119,9 +121,8 @@ jobs:
             '{include: [.include[] | select(.package as $p | $pkgs | index($p) == null)]}')" \
             >> "$GITHUB_OUTPUT"
 
-  # build-core would run here if any internal core deps existed
   build-core:
-    name: "[core] Build ${{ matrix.package }} / ${{ matrix.distro }} / ${{ matrix.arch }}"
+    name: "[core] Build ${{ matrix.package }} / ${{ matrix.platform }} / ${{ matrix.arch }}"
     needs: detect
     if: inputs.package == '' && needs.detect.outputs.core_build_matrix != '{"include":[]}'
     runs-on: ubuntu-latest
@@ -156,21 +157,21 @@ jobs:
         uses: actions/cache@v4
         with:
           path: packages/*/deps
-          key: deps-${{ matrix.package }}-${{ matrix.distro }}-${{ matrix.arch }}-${{ hashFiles('versions.yml') }}
+          key: deps-${{ matrix.package }}-${{ matrix.platform }}-${{ matrix.arch }}-${{ hashFiles('versions.yml') }}
       - name: Build package
         if: steps.check.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ secrets.BUILD_PKG_DISPATCH_TOKEN }}
         run: |
           bash scripts/build.sh "${{ matrix.package }}" \
-            --distro "${{ matrix.distro }}" \
+            --platform "${{ matrix.platform }}" \
             --arch   "${{ matrix.arch }}" \
             --output-dir output
       - name: Upload artifact
         if: steps.check.outputs.skip != 'true'
         uses: actions/upload-artifact@v6
         with:
-          name: ${{ matrix.package }}-${{ matrix.distro }}-${{ matrix.arch }}
+          name: ${{ matrix.package }}-${{ matrix.platform }}-${{ matrix.arch }}
           path: output/*.deb
           if-no-files-found: ignore
           retention-days: 1
@@ -205,7 +206,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   build:
-    name: Build ${{ matrix.package }} / ${{ matrix.distro }} / ${{ matrix.arch }}
+    name: Build ${{ matrix.package }} / ${{ matrix.platform }} / ${{ matrix.arch }}
     needs: [detect, release-core]
     if: "!failure() && !cancelled() && needs.detect.outputs.dependent_builds != '[]'"
     runs-on: ubuntu-latest
@@ -247,16 +248,16 @@ jobs:
         uses: actions/cache@v4
         with:
           path: packages/*/deps
-          key: deps-${{ matrix.package }}-${{ matrix.distro }}-${{ matrix.arch }}-${{ hashFiles('versions.yml') }}
+          key: deps-${{ matrix.package }}-${{ matrix.platform }}-${{ matrix.arch }}-${{ hashFiles('versions.yml') }}
 
       - name: Build package
         if: steps.check.outputs.skip != 'true'
         env:
-          # GH_TOKEN needed by build.sh to download depends_on .deb files from build-apt-packages.
+          # Download external build dependencies.
           GH_TOKEN: ${{ secrets.BUILD_PKG_DISPATCH_TOKEN }}
         run: |
           bash scripts/build.sh "${{ matrix.package }}" \
-            --distro "${{ matrix.distro }}" \
+            --platform "${{ matrix.platform }}" \
             --arch   "${{ matrix.arch }}" \
             --output-dir output
 
@@ -264,7 +265,7 @@ jobs:
         if: steps.check.outputs.skip != 'true'
         uses: actions/upload-artifact@v6
         with:
-          name: ${{ matrix.package }}-${{ matrix.distro }}-${{ matrix.arch }}
+          name: ${{ matrix.package }}-${{ matrix.platform }}-${{ matrix.arch }}
           path: output/*.deb
           if-no-files-found: ignore
           retention-days: 1
@@ -312,8 +313,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.APT_OMAKASUI_DISPATCH_TOKEN }}
         run: |
-          # workflow_dispatch: all packages use inputs.channel.
-          # push: per-package channel from versions.yml; stable → registered to both stable and dev.
+          # Manual runs override the package channel.
           CHANNEL="${{ inputs.channel }}"
           EVENT="${{ github.event_name }}"
           PAYLOAD=$(echo '${{ needs.detect.outputs.builds }}' | jq -c \
@@ -322,14 +322,25 @@ jobs:
             '[.[] | {
               package: .package,
               version: .version,
-              suites: ( .matrix.include | map(.suite) | unique | join(" ") ),
-              produces: .produces,
+              schema_version: 2,
+              targets: .targets,
               channel: (if $event == "workflow_dispatch" then $global_channel else (.channel // "dev") end)
             } | if $event != "workflow_dispatch" and .channel == "stable" then ., (. + {channel: "dev"}) else . end]')
 
-          BODY=$(jq -cn --argjson packages "$PAYLOAD" '{
+          CATALOG='[]'
+          while IFS= read -r PRODUCT; do
+            LABEL=$(yq e ".products.${PRODUCT}.label" build-matrix.yml)
+            while IFS= read -r SUITE; do
+              STATUS=$(yq e ".products.${PRODUCT}.suites.${SUITE}.status // \"active\"" build-matrix.yml)
+              CATALOG=$(jq -c --arg product "$PRODUCT" --arg suite "$SUITE" \
+                --arg label "$LABEL" --arg status "$STATUS" \
+                '. += [{product:$product,suite:$suite,label:$label,status:$status}]' <<< "$CATALOG")
+            done < <(yq e ".products.${PRODUCT}.suites | keys | .[]" build-matrix.yml)
+          done < <(yq e '.products | keys | .[]' build-matrix.yml)
+
+          BODY=$(jq -cn --argjson packages "$PAYLOAD" --argjson catalog "$CATALOG" '{
             event_type: "packages-updated",
-            client_payload: { packages: $packages }
+            client_payload: { schema_version: 2, catalog: $catalog, packages: $packages }
           }')
 
           gh api \

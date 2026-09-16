@@ -7,5 +7,10 @@ produces:
   - omari-drivers
   - omari-live
 
-distros:
-  - debian13
+publications:
+  omari:
+    produces:
+      - omari-base
+      - omari-desktop-niri
+      - omari-drivers
+      - omari-live

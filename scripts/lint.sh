@@ -33,6 +33,25 @@ CHECKED=0
 # A warning that doesn't bump the counter would let the lint pass silently.
 fail() { warn "$*"; ERRORS=$((ERRORS + 1)); }
 
+lint_targets() {
+  while IFS= read -r product; do
+    while IFS= read -r suite; do
+      local platform platform_suite status
+      platform=$(yq e ".products.${product}.suites.${suite}.platform // \"\"" build-matrix.yml)
+      status=$(yq e ".products.${product}.suites.${suite}.status // \"active\"" build-matrix.yml)
+      if [[ -z "$platform" || "$platform" == "null" ]]; then
+        fail "target ${product}/${suite}: platform is required"; continue
+      fi
+      platform_suite=$(yq e ".platforms.${platform}.suite // \"\"" build-matrix.yml)
+      [[ -n "$platform_suite" ]] || { fail "target ${product}/${suite}: unknown platform '${platform}'"; continue; }
+      [[ "$platform_suite" == "$suite" ]] || fail "target ${product}/${suite}: platform ${platform} builds suite ${platform_suite}"
+      [[ "$status" == "active" || "$status" == "deprecated" ]] || fail "target ${product}/${suite}: invalid status '${status}'"
+    done < <(yq e ".products.${product}.suites | keys | .[]" build-matrix.yml)
+  done < <(yq e '.products | keys | .[]' build-matrix.yml)
+}
+
+lint_targets
+
 lint_one() {
   local key="$1"
   local pkg_dir="packages/${key}"
@@ -106,23 +125,34 @@ lint_one() {
     fi
   fi
 
-  local distro_count valid_distros
-  distro_count=$(yq e '.distros | length' "$pkg_yaml" 2>/dev/null || echo 0)
-  if [[ "$distro_count" == "0" || "$distro_count" == "null" ]]; then
-    fail "${key}: no distros declared in package.yml"
+  local publication_count valid_products all_produces
+  publication_count=$(yq e '.publications | length' "$pkg_yaml" 2>/dev/null || echo 0)
+  if [[ "$publication_count" == "0" || "$publication_count" == "null" ]]; then
+    fail "${key}: no publications declared in package.yml"
   fi
 
-  valid_distros=$(yq e '.distros | keys | .[]' build-matrix.yml | tr '\n' ' ')
-  while IFS= read -r distro; do
-    [[ -z "$distro" ]] && continue
-    if ! grep -qw "$distro" <<< "$valid_distros"; then
-      fail "${key}: distro '${distro}' not in build-matrix.yml"
+  valid_products=$(yq e '.products | keys | .[]' build-matrix.yml | tr '\n' ' ')
+  all_produces=$(yq e '.produces[]' "$pkg_yaml" | tr '\n' ' ')
+  while IFS= read -r product; do
+    [[ -z "$product" ]] && continue
+    if ! grep -qw "$product" <<< "$valid_products"; then
+      fail "${key}: product '${product}' not in build-matrix.yml"
+      continue
     fi
-  done < <(yq e '.distros // [] | .[]' "$pkg_yaml")
+    while IFS= read -r produced; do
+      [[ -z "$produced" ]] && continue
+      if ! grep -qw "$produced" <<< "$all_produces"; then
+        fail "${key}: publication ${product} references undeclared output '${produced}'"
+      fi
+    done < <(yq e ".publications.${product}.produces // [] | .[]" "$pkg_yaml")
+    if [[ "$(yq e ".publications.${product}.produces | length" "$pkg_yaml")" == "0" ]]; then
+      fail "${key}: publication ${product} has no produces entries"
+    fi
+  done < <(yq e '.publications // {} | keys | .[]' "$pkg_yaml")
 
   # Catch typos in optional fields, which would otherwise be ignored silently.
   local unknown
-  unknown=$(yq e 'keys | .[]' "$pkg_yaml" | grep -vxE 'type|arch|produces|distros|source|layer_cache' || true)
+  unknown=$(yq e 'keys | .[]' "$pkg_yaml" | grep -vxE 'type|arch|produces|publications|source|layer_cache' || true)
   if [[ -n "$unknown" ]]; then
     fail "${key}: unknown package.yml field(s): $(echo "$unknown" | tr '\n' ' ')"
   fi

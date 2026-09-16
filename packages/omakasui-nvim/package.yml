@@ -7,7 +7,12 @@ produces:
   - omakub-nvim
   - omadeb-nvim
 
-distros:
-  - debian13
-  - ubuntu2404
-  - ubuntu2604
+publications:
+  omabuntu:
+    produces:
+      - omakasui-nvim
+      - omakub-nvim
+  omadeb:
+    produces:
+      - omakasui-nvim
+      - omadeb-nvim
