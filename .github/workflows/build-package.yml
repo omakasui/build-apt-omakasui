@@ -193,7 +193,25 @@ jobs:
           path: artifacts/
           pattern: ${{ matrix.package_entry.package }}-*
           merge-multiple: true
+      - name: Skip already published assets
+        id: immutable
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ matrix.package_entry.package }}-${{ matrix.package_entry.version }}
+        run: |
+          gh release view "$TAG" -R "$GITHUB_REPOSITORY" --json assets \
+            -q '.assets[] | "\(.name) \(.digest // "" | sub("^sha256:"; ""))"' > published.txt 2>/dev/null || : > published.txt
+          while read -r name digest; do
+            [[ -f "artifacts/${name}" ]] || continue
+            if [[ -n "$digest" && "$(sha256sum < "artifacts/${name}" | cut -d' ' -f1)" != "$digest" ]]; then
+              echo "::warning::${name} already published in ${TAG} with different content; keeping the published file. Bump the version to ship changes."
+            fi
+            rm -f "artifacts/${name}"
+          done < published.txt
+          compgen -G 'artifacts/*.deb' > /dev/null && echo "upload=true" >> "$GITHUB_OUTPUT" || echo "upload=false" >> "$GITHUB_OUTPUT"
+
       - name: Create or update Release
+        if: steps.immutable.outputs.upload == 'true'
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ matrix.package_entry.package }}-${{ matrix.package_entry.version }}
@@ -201,7 +219,7 @@ jobs:
           files: artifacts/*.deb
           fail_on_unmatched_files: true
           make_latest: true
-          overwrite_files: true
+          overwrite_files: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -290,7 +308,25 @@ jobs:
           pattern: ${{ matrix.package_entry.package }}-*
           merge-multiple: true
 
+      - name: Skip already published assets
+        id: immutable
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ matrix.package_entry.package }}-${{ matrix.package_entry.version }}
+        run: |
+          gh release view "$TAG" -R "$GITHUB_REPOSITORY" --json assets \
+            -q '.assets[] | "\(.name) \(.digest // "" | sub("^sha256:"; ""))"' > published.txt 2>/dev/null || : > published.txt
+          while read -r name digest; do
+            [[ -f "artifacts/${name}" ]] || continue
+            if [[ -n "$digest" && "$(sha256sum < "artifacts/${name}" | cut -d' ' -f1)" != "$digest" ]]; then
+              echo "::warning::${name} already published in ${TAG} with different content; keeping the published file. Bump the version to ship changes."
+            fi
+            rm -f "artifacts/${name}"
+          done < published.txt
+          compgen -G 'artifacts/*.deb' > /dev/null && echo "upload=true" >> "$GITHUB_OUTPUT" || echo "upload=false" >> "$GITHUB_OUTPUT"
+
       - name: Create or update Release
+        if: steps.immutable.outputs.upload == 'true'
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ matrix.package_entry.package }}-${{ matrix.package_entry.version }}
@@ -298,7 +334,7 @@ jobs:
           files: artifacts/*.deb
           fail_on_unmatched_files: true
           make_latest: true
-          overwrite_files: true
+          overwrite_files: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
