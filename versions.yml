@@ -19,7 +19,7 @@ omakasui-walker:
   depends_on: []
   auto_update: false
 omakasui-zellij:
-  version: "0.0.2"
+  version: "0.0.3"
   depends_on: []
   auto_update: true
 # External Deps (from omakasui/build-packages)
