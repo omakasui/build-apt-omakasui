@@ -20,8 +20,8 @@ omakasui-zellij:
   upstream: "github:omakasui/omakasui-zellij"
   tag_prefix: "v"
 
-omakasui-archive-keyring:
-  upstream: "codeberg:omakasui/omakasui-archive-keyring"
+omakasui-core-archive-keyring:
+  upstream: "github:omakasui/keyrings"
   tag_prefix: "v"
   use_tags: true
 

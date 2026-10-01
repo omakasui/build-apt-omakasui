@@ -21,6 +21,6 @@ MATRIX=$(sed -n 's/^build_matrix=//p' "$OUT")
 (cd "$ROOT" && GITHUB_OUTPUT="$OUT" bash scripts/detect-changes.sh --mode product --product omari --suite trixie) >/dev/null
 BUILDS=$(sed -n 's/^builds=//p' "$OUT")
 jq -e 'all(.[]; all(.targets[]; .product=="omari" and .suite=="trixie"))' <<< "$BUILDS" >/dev/null
-jq -e 'all(.[]; all(.targets[].produces[]; startswith("omari-") or .=="omakasui-archive-keyring" or .=="calamares-settings-omari"))' <<< "$BUILDS" >/dev/null
+jq -e 'all(.[]; all(.targets[].produces[]; startswith("omari-") or .=="omakasui-core-archive-keyring" or .=="calamares-settings-omari"))' <<< "$BUILDS" >/dev/null
 
 echo 'Target resolution tests OK.'

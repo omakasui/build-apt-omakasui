@@ -22,6 +22,11 @@ omakasui-zellij:
   version: "0.0.3"
   depends_on: []
   auto_update: true
+omakasui-core-archive-keyring:
+  version: "1.1.0"
+  depends_on: []
+  stable_release: true
+  auto_update: true
 # External Deps (from omakasui/build-packages)
 nvim:
   version: "0.12.5"
@@ -29,10 +34,6 @@ nvim:
   external: true
   auto_update: true
 # Omari core packages (built from omakasui/omari-os)
-omakasui-archive-keyring:
-  version: "1.0.0"
-  depends_on: []
-  auto_update: false
 omari-base-files:
   version: "1.0.0-testing1"
   depends_on: []
