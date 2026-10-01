@@ -345,6 +345,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
       - name: Build batch payload and dispatch
         env:
           GH_TOKEN: ${{ secrets.APT_OMAKASUI_DISPATCH_TOKEN }}
@@ -373,6 +376,7 @@ jobs:
                 '. += [{product:$product,suite:$suite,label:$label,status:$status}]' <<< "$CATALOG")
             done < <(yq e ".products.${PRODUCT}.suites | keys | .[]" build-matrix.yml)
           done < <(yq e '.products | keys | .[]' build-matrix.yml)
+          [[ "$CATALOG" != '[]' ]] || { echo 'ERROR: empty target catalog'; exit 1; }
 
           BODY=$(jq -cn --argjson packages "$PAYLOAD" --argjson catalog "$CATALOG" '{
             event_type: "packages-updated",
