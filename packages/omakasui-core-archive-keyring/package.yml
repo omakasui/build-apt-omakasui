@@ -12,6 +12,3 @@ publications:
   omadeb:
     produces:
       - omakasui-core-archive-keyring
-  omari:
-    produces:
-      - omakasui-core-archive-keyring

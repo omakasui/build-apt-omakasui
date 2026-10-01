@@ -39,10 +39,3 @@ products:
       trixie:
         platform: debian13
         status: active
-
-  omari:
-    label: Omari
-    suites:
-      trixie:
-        platform: debian13
-        status: active

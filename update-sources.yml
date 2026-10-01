@@ -25,26 +25,6 @@ omakasui-core-archive-keyring:
   tag_prefix: "v"
   use_tags: true
 
-omari-base-files:
-  upstream: "codeberg:omakasui/omari-base-files"
-  tag_prefix: "v"
-  use_tags: true
-
-omari-meta:
-  upstream: "codeberg:omakasui/omari-meta"
-  tag_prefix: "v"
-  use_tags: true
-
-omari-settings:
-  upstream: "codeberg:omakasui/omari-settings"
-  tag_prefix: "v"
-  use_tags: true
-
-calamares-settings-omari:
-  upstream: "codeberg:omakasui/calamares-settings-omari"
-  tag_prefix: "v"
-  use_tags: true
-
 # External dep, sourced from omakasui/build-apt-packages, not built here.
 nvim:
   upstream: "sibling:omakasui/build-apt-packages"
