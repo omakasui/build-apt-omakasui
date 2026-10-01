@@ -39,11 +39,3 @@ products:
       trixie:
         platform: debian13
         status: active
-
-  # Retired: kept as deprecated so apt-omakasui keeps a valid catalog row.
-  omari:
-    label: Omari
-    suites:
-      trixie:
-        platform: debian13
-        status: deprecated
