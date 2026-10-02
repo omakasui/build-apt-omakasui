@@ -21,7 +21,7 @@ omakasui-zellij:
   tag_prefix: "v"
 
 omakasui-core-archive-keyring:
-  upstream: "github:omakasui/keyrings"
+  upstream: "github:omakasui/omakasui-archive-keyring"
   tag_prefix: "v"
   use_tags: true
 
