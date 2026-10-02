@@ -1,4 +1,4 @@
-# Metapackage — no files to install.
+# Metapackage
 
 ARG BASE_IMAGE
 FROM ${BASE_IMAGE:-debian:trixie-slim}

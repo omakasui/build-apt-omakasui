@@ -1,6 +1,4 @@
-# Builds omakasui-zellij / omakub-zellij / omadeb-zellij from the
-# omakasui/omakasui-zellij repo.
-# Upstream: https://github.com/zellij-org/zellij
+# Upstream: https://github.com/omakasui/omakasui-zellij
 
 ARG BASE_IMAGE
 FROM ${BASE_IMAGE:-debian:trixie-slim}

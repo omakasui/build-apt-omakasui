@@ -1,5 +1,4 @@
-# Builds omakub-nvim / omadeb-nvim from the omakasui/omakasui-nvim repo.
-# Upstream LazyVim starter: https://github.com/LazyVim/starter
+# Upstream: https://github.com/omakasui/omakasui-nvim
 
 ARG BASE_IMAGE
 FROM ${BASE_IMAGE:-debian:trixie-slim}

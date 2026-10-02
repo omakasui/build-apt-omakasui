@@ -1,4 +1,4 @@
-# Builds omakasui-devtools from the omakasui/omakasui-devtools repo.
+# Upstream: https://github.com/omakasui/omakasui-devtools
 
 ARG BASE_IMAGE
 FROM ${BASE_IMAGE:-debian:trixie-slim}
