@@ -23,7 +23,7 @@ omakasui-zellij:
   depends_on: []
   auto_update: true
 omakasui-core-archive-keyring:
-  version: "1.2.0"
+  version: "1.2.1"
   depends_on: []
   stable_release: true
   auto_update: true
